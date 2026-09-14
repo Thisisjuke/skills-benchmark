@@ -54,6 +54,13 @@ jobs:
       - name: Verify trusted-publishing npm CLI
         run: test "$(npx --yes npm@12.0.2 --version)" = "12.0.2"
 
+      - name: Verify trusted-publishing OIDC context
+        shell: bash
+        run: |
+          test "$GITHUB_ACTIONS" = "true"
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+
       - name: Resolve accepted artifact paths
         id: artifacts
         shell: bash
@@ -88,7 +95,7 @@ jobs:
 
       - name: Publish CLI
         if: steps.cli-registry.outputs.should-publish == 'true'
-        run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.cli }}" --access public
+        run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.cli }}" --access public --provenance=false --loglevel verbose
 
       - name: Check Web registry state
         id: web-registry
@@ -113,4 +120,4 @@ jobs:
 
       - name: Publish Web
         if: steps.web-registry.outputs.should-publish == 'true'
-        run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.web }}" --access public
+        run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.web }}" --access public --provenance=false --loglevel verbose
