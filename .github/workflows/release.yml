@@ -40,65 +40,66 @@ jobs:
           fi
           echo "RELEASE_VERSION=$cli_version" >> "$GITHUB_ENV"
 
-      - name: Install dependencies
-        run: vp install --frozen-lockfile
-
-      - name: Check workspace
-        run: vp run check
-
-      - name: Build and validate exact release artifacts
-        run: vp run smoke:release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Verify trusted-publishing npm CLI
-        run: test "$(npx --yes npm@12.0.2 --version)" = "12.0.2"
-
-      - name: Verify trusted-publishing OIDC context
+      - name: Verify npm trusted-publishing identity
         shell: bash
         run: |
+          test "$(npx --yes npm@12.0.2 --version)" = "12.0.2"
           test "$GITHUB_ACTIONS" = "true"
           test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
           test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
-          node --input-type=module <<'NODE'
-          const requestUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
-          requestUrl.searchParams.set("audience", "npm:registry.npmjs.org")
+          test "$GITHUB_REPOSITORY" = "Thisisjuke/skills-benchmark"
+          case "$GITHUB_WORKFLOW_REF" in
+            Thisisjuke/skills-benchmark/.github/workflows/release.yml@*) ;;
+            *) echo "::error::Unexpected workflow identity: $GITHUB_WORKFLOW_REF"; exit 1 ;;
+          esac
 
-          const response = await fetch(requestUrl, {
-            headers: {
-              authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`,
-            },
-          })
-          if (!response.ok) {
-            throw new Error(`Unable to request the GitHub OIDC token: ${response.status}`)
-          }
-
-          const { value: token } = await response.json()
-          const [, encodedClaims] = token.split(".")
-          const claims = JSON.parse(
-            Buffer.from(encodedClaims, "base64url").toString("utf8"),
-          )
-          console.log("Trusted-publisher identity:")
-          console.log(
-            JSON.stringify(
-              {
-                audience: claims.aud,
-                repository: claims.repository,
-                workflow: claims.job_workflow_ref,
-                ref: claims.ref,
-                repositoryVisibility: claims.repository_visibility,
-                environment: claims.environment ?? null,
-              },
-              null,
-              2,
-            ),
-          )
-          NODE
-
-      - name: Resolve accepted artifact paths
-        id: artifacts
+      - name: Check npm registry state
+        id: registry
         shell: bash
         run: |
+          any=false
+          for entry in \
+            "cli|@thisisjuke/skillbench" \
+            "web|@thisisjuke/skillbench-web"
+          do
+            product="${entry%%|*}"
+            package="${entry#*|}"
+            set +e
+            output="$(npx --yes npm@12.0.2 view "$package@$RELEASE_VERSION" version 2>&1)"
+            status=$?
+            set -e
+            if [[ $status -eq 0 ]]; then
+              if [[ "$output" != "$RELEASE_VERSION" ]]; then
+                echo "::error::Registry returned unexpected $product version: $output"
+                exit 1
+              fi
+              echo "$product=false" >> "$GITHUB_OUTPUT"
+            elif grep -Fq "npm error code E404" <<< "$output"; then
+              echo "$product=true" >> "$GITHUB_OUTPUT"
+              any=true
+            else
+              printf '%s\n' "$output"
+              exit "$status"
+            fi
+          done
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.registry.outputs.any == 'true'
+        run: vp install --frozen-lockfile
+
+      - name: Build, type-check, and test workspace
+        if: steps.registry.outputs.any == 'true'
+        run: vp run check
+
+      - name: Package and smoke-test release artifacts
+        if: steps.registry.outputs.any == 'true'
+        id: artifacts
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          vp run smoke:release
           cli_path="$(node -p 'require("./artifacts/release-artifacts.json").artifacts.find(({ product }) => product === "cli").path')"
           web_path="$(node -p 'require("./artifacts/release-artifacts.json").artifacts.find(({ product }) => product === "web").path')"
           test -f "$cli_path"
@@ -106,52 +107,10 @@ jobs:
           echo "cli=$cli_path" >> "$GITHUB_OUTPUT"
           echo "web=$web_path" >> "$GITHUB_OUTPUT"
 
-      - name: Check CLI registry state
-        id: cli-registry
-        shell: bash
-        run: |
-          set +e
-          output="$(npm view "@thisisjuke/skillbench@$RELEASE_VERSION" version 2>&1)"
-          status=$?
-          set -e
-          if [[ $status -eq 0 ]]; then
-            if [[ "$output" != "$RELEASE_VERSION" ]]; then
-              echo "::error::Registry returned unexpected CLI version: $output"
-              exit 1
-            fi
-            echo "should-publish=false" >> "$GITHUB_OUTPUT"
-          elif grep -Fxq "npm error code E404" <<< "$output"; then
-            echo "should-publish=true" >> "$GITHUB_OUTPUT"
-          else
-            printf '%s\n' "$output"
-            exit "$status"
-          fi
-
       - name: Publish CLI
-        if: steps.cli-registry.outputs.should-publish == 'true'
+        if: steps.registry.outputs.cli == 'true'
         run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.cli }}" --access public --provenance=false --loglevel verbose
 
-      - name: Check Web registry state
-        id: web-registry
-        shell: bash
-        run: |
-          set +e
-          output="$(npm view "@thisisjuke/skillbench-web@$RELEASE_VERSION" version 2>&1)"
-          status=$?
-          set -e
-          if [[ $status -eq 0 ]]; then
-            if [[ "$output" != "$RELEASE_VERSION" ]]; then
-              echo "::error::Registry returned unexpected Web version: $output"
-              exit 1
-            fi
-            echo "should-publish=false" >> "$GITHUB_OUTPUT"
-          elif grep -Fxq "npm error code E404" <<< "$output"; then
-            echo "should-publish=true" >> "$GITHUB_OUTPUT"
-          else
-            printf '%s\n' "$output"
-            exit "$status"
-          fi
-
       - name: Publish Web
-        if: steps.web-registry.outputs.should-publish == 'true'
+        if: steps.registry.outputs.web == 'true'
         run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.web }}" --access public --provenance=false --loglevel verbose
