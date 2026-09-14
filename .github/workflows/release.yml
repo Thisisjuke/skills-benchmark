@@ -51,10 +51,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Pin trusted-publishing npm CLI
-        run: |
-          npm install --global npm@12.0.2
-          test "$(npm --version)" = "12.0.2"
+      - name: Verify trusted-publishing npm CLI
+        run: test "$(npx --yes npm@12.0.2 --version)" = "12.0.2"
 
       - name: Resolve accepted artifact paths
         id: artifacts
@@ -90,7 +88,7 @@ jobs:
 
       - name: Publish CLI
         if: steps.cli-registry.outputs.should-publish == 'true'
-        run: npm publish "${{ steps.artifacts.outputs.cli }}" --access public
+        run: npx --yes npm@12.0.2 publish "${{ steps.artifacts.outputs.cli }}" --access public
 
       - name: Check Web registry state
         id: web-registry
@@ -115,4 +113,4 @@ jobs:
 
       - name: Publish Web
         if: steps.web-registry.outputs.should-publish == 'true'
-        run: npm publish "${{ steps.artifacts.outputs.web }}" --access public
+        run: npx --yes npm@12.0.2 publish "${{ steps.artifacts.outputs.web }}" --access public
