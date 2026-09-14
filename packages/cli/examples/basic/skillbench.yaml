@@ -1,0 +1,9 @@
+runner:
+  type: mock
+eval:
+  repeat: 3
+  timeoutMs: 5000
+merge:
+  candidates: 3
+  requireImprovement: true
+  minimumImprovement: 0

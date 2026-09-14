@@ -1,0 +1,30 @@
+{
+  "name": "@skillbench/assertions-promptfoo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Promptfoo assertion adapter for Skillbench",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "vp run build && tsc --noEmit",
+    "test": "vp run build && vp run @skillbench/test-contracts#build && vp test run --passWithNoTests",
+    "check": "vp run build && vp run @skillbench/test-contracts#build && tsc --noEmit && vp test run --passWithNoTests"
+  },
+  "dependencies": {
+    "@skillbench/sdk": "workspace:*",
+    "promptfoo": "0.122.2"
+  },
+  "devDependencies": {
+    "@skillbench/test-contracts": "workspace:*",
+    "publint": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

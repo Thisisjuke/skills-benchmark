@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Validate and publish both products
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Vite+, Node, and pnpm
+        uses: voidzero-dev/setup-vp@49c3e4e92c52e7f8392712a9267bbe71c5ab30e5 # v1.19.0
+        with:
+          node-version: 22.22.2
+          cache: false
+          run-install: false
+
+      - name: Validate tag and fixed product version
+        shell: bash
+        run: |
+          cli_version="$(node -p 'require("./packages/cli/package.json").version')"
+          web_version="$(node -p 'require("./apps/web/package.json").version')"
+          if [[ "$cli_version" != "$web_version" ]]; then
+            echo "::error::CLI $cli_version and Web $web_version versions differ."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_NAME" != "v$cli_version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME must exactly equal v$cli_version."
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$cli_version" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Check workspace
+        run: vp run check
+
+      - name: Build and validate exact release artifacts
+        run: vp run smoke:release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Pin trusted-publishing npm CLI
+        run: |
+          npm install --global npm@12.0.2
+          test "$(npm --version)" = "12.0.2"
+
+      - name: Resolve accepted artifact paths
+        id: artifacts
+        shell: bash
+        run: |
+          cli_path="$(node -p 'require("./artifacts/release-artifacts.json").artifacts.find(({ product }) => product === "cli").path')"
+          web_path="$(node -p 'require("./artifacts/release-artifacts.json").artifacts.find(({ product }) => product === "web").path')"
+          test -f "$cli_path"
+          test -f "$web_path"
+          echo "cli=$cli_path" >> "$GITHUB_OUTPUT"
+          echo "web=$web_path" >> "$GITHUB_OUTPUT"
+
+      - name: Check CLI registry state
+        id: cli-registry
+        shell: bash
+        run: |
+          set +e
+          output="$(npm view "@thisisjuke/skillbench@$RELEASE_VERSION" version 2>&1)"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            if [[ "$output" != "$RELEASE_VERSION" ]]; then
+              echo "::error::Registry returned unexpected CLI version: $output"
+              exit 1
+            fi
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+          elif grep -Fxq "npm error code E404" <<< "$output"; then
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$output"
+            exit "$status"
+          fi
+
+      - name: Publish CLI
+        if: steps.cli-registry.outputs.should-publish == 'true'
+        run: npm publish "${{ steps.artifacts.outputs.cli }}" --access public
+
+      - name: Check Web registry state
+        id: web-registry
+        shell: bash
+        run: |
+          set +e
+          output="$(npm view "@thisisjuke/skillbench-web@$RELEASE_VERSION" version 2>&1)"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            if [[ "$output" != "$RELEASE_VERSION" ]]; then
+              echo "::error::Registry returned unexpected Web version: $output"
+              exit 1
+            fi
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+          elif grep -Fxq "npm error code E404" <<< "$output"; then
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$output"
+            exit "$status"
+          fi
+
+      - name: Publish Web
+        if: steps.web-registry.outputs.should-publish == 'true'
+        run: npm publish "${{ steps.artifacts.outputs.web }}" --access public

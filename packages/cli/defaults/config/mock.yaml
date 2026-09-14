@@ -1,0 +1,11 @@
+runner:
+  type: mock
+  executable: mock
+  sandbox: workspace-write
+
+eval:
+  repeat: 1
+  timeoutMs: 180000
+
+promptfoo:
+  enabled: true

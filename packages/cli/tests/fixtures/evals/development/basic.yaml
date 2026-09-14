@@ -1,0 +1,22 @@
+id: fixture-quality
+name: Validate the deterministic fixture
+prompt: |
+  Inspect the fixture project and preserve its output.
+fixtures:
+  - source: fixtures/project
+    destination: .
+assertions:
+  - type: file-exists
+    value: output.txt
+  - type: contains
+    path: output.txt
+    value: deterministic
+  - type: regex
+    path: output.txt
+    pattern: "^deterministic output\\n$"
+  - type: command
+    command: [node, --version]
+  - type: exit-code
+    value: 0
+  - type: llm-rubric
+    rubric: Confirm the output is concise.

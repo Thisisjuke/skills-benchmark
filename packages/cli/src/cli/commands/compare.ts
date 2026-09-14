@@ -1,0 +1,104 @@
+import type { Command } from "commander";
+
+import { executeCompare } from "../../application";
+import type { EvalPartition } from "@skillbench/sdk/evaluator";
+import type { ExecutionCommandContext } from "../command-context";
+import {
+  getGlobalOptions,
+  partition,
+  positiveInteger,
+  sourceResolveOptions,
+  validateOutputOptions,
+} from "../options";
+import { ensureInitializedProject } from "../ensure-project";
+import { renderCompareResult } from "../renderers";
+
+export function registerCompareCommand(program: Command, context: ExecutionCommandContext): void {
+  program
+    .command("compare")
+    .description("compare two skills against the same YAML eval suite")
+    .argument("[skill-a]", "first skill directory or GitHub source")
+    .argument("[skill-b]", "second skill directory or GitHub source")
+    .option("--evals <path>", "eval YAML file or directory")
+    .option("--partition <partition>", "development or holdout", partition)
+    .option("--repeat <count>", "override the configured repetition count", positiveInteger)
+    .option("--skill-path-a <path>", "repository-relative SKILL.md path for the first source")
+    .option("--skill-path-b <path>", "repository-relative SKILL.md path for the second source")
+    .option("--keep-workspaces", "retain temporary workspaces for debugging")
+    .option("-o, --output <directory>", "write a portable result bundle")
+    .option("--force", "replace the exact bundle at --output")
+    .option("--json", "write structured JSON")
+    .action(
+      async (
+        inputA: string | undefined,
+        inputB: string | undefined,
+        options: {
+          evals?: string;
+          partition?: EvalPartition;
+          repeat?: number;
+          skillPathA?: string;
+          skillPathB?: string;
+          keepWorkspaces?: boolean;
+          output?: string;
+          force?: boolean;
+          json?: boolean;
+        },
+        command: Command,
+      ) => {
+        const session = context.sessionFor(command, options.json === true);
+        const { config, layout, initializationChoice } = await ensureInitializedProject(
+          context,
+          command,
+          options.json === true,
+        );
+        const globalOptions = getGlobalOptions(command);
+        const runnerChoice =
+          initializationChoice ?? (await session.runnerChoice(config, globalOptions));
+        const sourceA = await session.requiredText(
+          inputA,
+          "skill-a",
+          "What is the first source (path or GitHub URL)?",
+        );
+        const sourceB = await session.requiredText(
+          inputB,
+          "skill-b",
+          "What is the second source (path or GitHub URL)?",
+        );
+        const evals = await session.value(
+          options.evals,
+          "Which evaluation file or directory should be used?",
+          "evals/development",
+        );
+        const repeat = await session.count(options.repeat, "How many repetitions?", config.eval.repeat);
+        const output = await session.output(options.output, "results/comparison.skillbench");
+        validateOutputOptions({
+          ...(output === undefined ? {} : { output }),
+          ...(options.force === undefined ? {} : { force: options.force }),
+        });
+        const operation = await executeCompare(context.application, {
+          config,
+          projectRoot: layout.root,
+          selectRunner: async () => runnerChoice,
+          sourceA,
+          sourceB,
+          resolveOptionsA: sourceResolveOptions(command, session, options.skillPathA),
+          resolveOptionsB: sourceResolveOptions(command, session, options.skillPathB),
+          evals,
+          recordHistory: session.interactive && globalOptions.history !== false,
+          events: session,
+          ...(options.partition === undefined ? {} : { partition: options.partition }),
+          repeat,
+          ...(options.keepWorkspaces === undefined
+            ? {}
+            : { keepWorkspaces: options.keepWorkspaces }),
+          ...(output === undefined ? {} : { output }),
+          ...(options.force === undefined ? {} : { force: options.force }),
+        });
+        if (options.json === true || context.jsonl(command)) {
+          context.writeJson("compare", operation.result);
+          return;
+        }
+        context.writeStdout(renderCompareResult({ sourceA, sourceB, evals, operation }));
+      },
+    );
+}

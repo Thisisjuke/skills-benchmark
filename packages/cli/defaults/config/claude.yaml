@@ -1,0 +1,13 @@
+runner:
+  type: claude
+  executable: claude
+  model: {{model}}
+  reasoningEffort: {{reasoningEffort}}
+  sandbox: workspace-write
+
+eval:
+  repeat: 1
+  timeoutMs: 180000
+
+promptfoo:
+  enabled: true

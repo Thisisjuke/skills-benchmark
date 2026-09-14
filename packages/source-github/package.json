@@ -1,0 +1,30 @@
+{
+  "name": "@skillbench/source-github",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub skill source adapter for Skillbench",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "vp run build && tsc --noEmit",
+    "test": "vp run build && vp run @skillbench/test-contracts#build && vp test run --passWithNoTests",
+    "check": "vp run build && vp run @skillbench/test-contracts#build && tsc --noEmit && vp test run --passWithNoTests"
+  },
+  "dependencies": {
+    "@octokit/request": "catalog:",
+    "@skillbench/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@skillbench/test-contracts": "workspace:*",
+    "publint": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

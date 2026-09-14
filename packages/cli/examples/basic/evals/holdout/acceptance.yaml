@@ -1,0 +1,11 @@
+id: hidden-acceptance
+name: Validate the final candidate without exposing development guidance
+prompt: |
+  Inspect the prepared workspace and complete the requested task successfully.
+assertions:
+  - type: exit-code
+    value: 0
+  - type: promptfoo
+    assertion:
+      type: equals
+      value: ""

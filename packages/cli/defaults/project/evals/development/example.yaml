@@ -1,0 +1,7 @@
+id: example
+name: Example evaluation
+partition: development
+prompt: Follow the installed skill and complete the requested task.
+assertions:
+  - type: exit-code
+    value: 0

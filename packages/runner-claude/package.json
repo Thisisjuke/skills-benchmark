@@ -1,0 +1,34 @@
+{
+  "name": "@skillbench/runner-claude",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code CLI runner adapter for Skillbench",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "vp run build && tsc --noEmit",
+    "test": "vp run build && vp run @skillbench/test-contracts#build && vp test run --passWithNoTests",
+    "test:live": "vp run build && SKILLBENCH_CLAUDE_LIVE=1 vp test run tests/claude-live.test.ts",
+    "check": "vp run build && vp run @skillbench/test-contracts#build && tsc --noEmit && vp test run --passWithNoTests"
+  },
+  "dependencies": {
+    "@skillbench/invocation-contract": "workspace:*",
+    "@skillbench/sdk": "workspace:*",
+    "execa": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@skillbench/runner-kit": "workspace:*",
+    "@skillbench/test-contracts": "workspace:*",
+    "publint": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

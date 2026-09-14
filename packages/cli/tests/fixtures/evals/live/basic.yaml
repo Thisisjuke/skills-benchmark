@@ -1,0 +1,7 @@
+id: live-protocol
+name: Validate a minimal live response
+prompt: Reply with exactly SKILLBENCH_LIVE_COMPARE_OK and do not use tools.
+partition: development
+assertions:
+  - type: exit-code
+    value: 0

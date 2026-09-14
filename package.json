@@ -1,0 +1,48 @@
+{
+  "name": "skillbench-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Vite+ monorepo for the Skillbench CLI and local Web application",
+  "homepage": "https://github.com/Thisisjuke/skills-benchmark#readme",
+  "bugs": {
+    "url": "https://github.com/Thisisjuke/skills-benchmark/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Thisisjuke/skills-benchmark.git"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "boundaries": "node scripts/check-workspace-boundaries.mjs",
+    "build": "vp run @thisisjuke/skillbench-web#build",
+    "changeset": "changeset",
+    "dev": "vp run @thisisjuke/skillbench-web#dev",
+    "instructions": "node scripts/check-runtime-instructions.mjs",
+    "lint": "vp lint apps packages scripts vite.config.ts vite.library.config.js --deny-warnings",
+    "check": "vp run boundaries && vp run instructions && vp run lint && vp run -r --concurrency-limit 1 check",
+    "smoke:release": "vp run build && node scripts/smoke-release.mjs",
+    "test": "vp run -r --concurrency-limit 1 test",
+    "typecheck": "vp run -r --concurrency-limit 1 typecheck",
+    "version-packages": "changeset version",
+    "skillbench": "vp -C packages/cli run skillbench",
+    "skillbench:web": "vp -C apps/web run start --"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.2",
+    "@types/node": "26.4.1",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "7.0.2",
+    "vite-plus": "0.3.0"
+  },
+  "engines": {
+    "node": ">=22.22.2",
+    "pnpm": ">=11.24.0"
+  },
+  "packageManager": "pnpm@11.24.0"
+}

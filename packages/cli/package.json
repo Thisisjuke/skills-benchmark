@@ -1,0 +1,65 @@
+{
+  "name": "@thisisjuke/skillbench",
+  "version": "0.1.1",
+  "description": "Local-first benchmark CLI for Agent Skills",
+  "homepage": "https://github.com/Thisisjuke/skills-benchmark/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/Thisisjuke/skills-benchmark/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Thisisjuke/skills-benchmark.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "skillbench": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "defaults",
+    "skillbench.example.yaml"
+  ],
+  "type": "module",
+  "exports": {
+    "./cli-path": "./dist/cli-path.mjs",
+    "./contracts": "./dist/contracts/index.mjs",
+    "./contracts/bundles": "./dist/contracts/bundles.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "skillbench": "vp run build && node dist/cli.mjs",
+    "typecheck": "vp run @skillbench/sdk#build && tsc --noEmit",
+    "test": "vp run build && vp test run",
+    "test:integration": "vp run build && vp test run tests/integration",
+    "test:github-live": "vp run build && SKILLBENCH_GITHUB_LIVE=1 vp test run tests/integration/github-live.test.ts",
+    "test:codex-live": "vp run build && SKILLBENCH_CODEX_LIVE=1 vp test run tests/integration/codex-live.test.ts",
+    "check": "vp run build && tsc --noEmit && vp test run"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.7.0",
+    "@octokit/request": "catalog:",
+    "commander": "catalog:",
+    "execa": "catalog:",
+    "promptfoo": "0.122.2",
+    "yaml": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@skillbench/assertions-promptfoo": "workspace:*",
+    "@skillbench/invocation-contract": "workspace:*",
+    "@skillbench/runner-claude": "workspace:*",
+    "@skillbench/runner-codex": "workspace:*",
+    "@skillbench/sdk": "workspace:*",
+    "@skillbench/source-github": "workspace:*",
+    "@skillbench/test-contracts": "workspace:*",
+    "publint": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

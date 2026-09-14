@@ -1,0 +1,40 @@
+runner:
+  type: codex
+  executable: codex
+  sandbox: workspace-write
+  maxOutputBytes: 1048576
+
+eval:
+  repeat: 3
+  timeoutMs: 180000
+
+comparison:
+  tieThreshold: 0.01
+  weights:
+    functionalCorrectness: 0.40
+    outputQuality: 0.20
+    edgeCases: 0.15
+    skillTriggering: 0.10
+    instructionFollowing: 0.05
+    tokenEfficiency: 0.05
+    latency: 0.05
+
+judge:
+  blind: true
+  reversePairwise: true
+
+promptfoo:
+  enabled: true
+
+merge:
+  candidates: 3
+  requireImprovement: true
+  minimumImprovement: 0
+
+reports:
+  markdown: true
+
+sources:
+  timeoutMs: 30000
+  maxFileSizeBytes: 2097152
+  maxSnapshotSizeBytes: 26214400

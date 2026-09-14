@@ -1,0 +1,5 @@
+schemaVersion: 1
+assets:
+  judgeSkill: judge/SKILL.md
+  judgeInstruction: prompts/judge-instruction.txt
+  mergeCandidateTemplate: templates/merge-candidate.md

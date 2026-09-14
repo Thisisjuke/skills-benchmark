@@ -1,0 +1,22 @@
+packages:
+  - packages/*
+  - apps/*
+
+catalog:
+  '@octokit/request': 10.0.13
+  commander: 15.0.0
+  execa: 10.0.1
+  publint: 0.3.24
+  react: 19.2.8
+  react-dom: 19.2.8
+  yaml: 2.9.0
+  zod: 4.5.4
+
+allowBuilds:
+  '@playwright/browser-chromium': false
+  '@swc/core': false
+  better-sqlite3: true
+  esbuild: true
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
