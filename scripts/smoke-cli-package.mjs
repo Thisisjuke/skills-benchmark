@@ -108,7 +108,7 @@ try {
   }
   runCli(["init", "--no-input"]);
   writeFileSync(
-    join(projectRoot, "evals", "development", "example.yaml"),
+    join(projectRoot, ".skillbench", "evals", "development", "example.yaml"),
     [
       "id: package-smoke",
       "name: Packaged Promptfoo smoke",
@@ -133,7 +133,7 @@ try {
       "eval",
       skillRoot,
       "--evals",
-      "evals/development",
+      ".skillbench/evals/development",
       "--repeat",
       "1",
       "--json",
@@ -155,7 +155,7 @@ try {
       skillRoot,
       skillRoot,
       "--evals",
-      "evals/development",
+      ".skillbench/evals/development",
       "--repeat",
       "1",
       "--json",
@@ -175,7 +175,7 @@ try {
         skillRoot,
         "https://github.com/openai/skills/tree/main/skills/.system/skill-creator",
         "--evals",
-        "evals/development",
+        ".skillbench/evals/development",
         "--repeat",
         "1",
         "--json",

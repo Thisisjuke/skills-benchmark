@@ -1,4 +1,4 @@
-import { Command, InvalidArgumentError } from "commander";
+import { Command, InvalidArgumentError, Option } from "commander";
 
 import type { EvalPartition } from "@skillbench/sdk/evaluator";
 import { SkillbenchError } from "@skillbench/sdk/errors";
@@ -12,6 +12,7 @@ import {
 } from "../composition/runner-registry";
 import type { ResolveOptions } from "@skillbench/sdk/sources";
 import type { PromptSession } from "./interactive";
+import type { RunOutputOptions } from "./run-output";
 
 export type GlobalOptions = {
   config?: string;
@@ -95,7 +96,27 @@ export function sourceResolveOptions(
   };
 }
 
-export function validateOutputOptions(options: { output?: string; force?: boolean }): void {
+class NoOutputOption extends Option {
+  override attributeName(): string {
+    return "outputEnabled";
+  }
+}
+
+export function noOutputOption(): Option {
+  return new NoOutputOption("--no-output", "do not save an automatic result bundle");
+}
+
+export function validateOutputOptions(options: RunOutputOptions): void {
+  if (options.outputEnabled === false && options.output !== undefined) {
+    throw new SkillbenchError("--no-output cannot be used with --output <directory>", {
+      code: "CLI_OUTPUT_CONFLICT",
+    });
+  }
+  if (options.outputEnabled === false && options.force === true) {
+    throw new SkillbenchError("--no-output cannot be used with --force", {
+      code: "CLI_OUTPUT_CONFLICT",
+    });
+  }
   if (options.force === true && options.output === undefined) {
     throw new SkillbenchError("--force requires --output <directory>", {
       code: "CLI_OUTPUT_REQUIRED",

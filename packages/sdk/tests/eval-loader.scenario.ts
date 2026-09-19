@@ -7,6 +7,22 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { loadEvalSuite } from "@skillbench/sdk/evaluator";
 
+function expectEvalError(
+  load: () => unknown,
+  code: string,
+  expectedMessageParts: readonly string[],
+): void {
+  try {
+    load();
+  } catch (error) {
+    expect(error).toMatchObject({ code });
+    expect(error).toBeInstanceOf(Error);
+    for (const part of expectedMessageParts) expect((error as Error).message).toContain(part);
+    return;
+  }
+  throw new Error(`Expected ${code}`);
+}
+
 describe("loadEvalSuite", () => {
   it("loads a development suite with fixtures and every V1 assertion", () => {
     const suite = loadEvalSuite("tests/fixtures/evals/development");
@@ -42,7 +58,46 @@ describe("loadEvalSuite", () => {
     writeFileSync(join(development, "a.yaml"), yaml);
     writeFileSync(join(development, "b.yaml"), yaml);
 
-    expect(() => loadEvalSuite(development)).toThrow(/Duplicate eval id/);
+    expectEvalError(() => loadEvalSuite(development), "EVAL_ID_DUPLICATE", [
+      join(development, "a.yaml"),
+      join(development, "b.yaml"),
+      "unique id",
+    ]);
+  });
+
+  it("explains how to repair missing, empty, invalid, and mispartitioned suites", () => {
+    const root = mkdtempSync(join(tmpdir(), "skillbench-eval-errors-"));
+    const missing = join(root, "missing");
+    expectEvalError(() => loadEvalSuite(missing), "EVAL_PATH_NOT_FOUND", [
+      missing,
+      "Create it or provide the path",
+    ]);
+
+    const empty = join(root, "empty");
+    mkdirSync(empty);
+    expectEvalError(() => loadEvalSuite(empty), "EVAL_SUITE_EMPTY", [
+      empty,
+      "Add at least one .yaml or .yml eval file",
+    ]);
+
+    const invalid = join(root, "invalid.yaml");
+    writeFileSync(invalid, "id: invalid\n");
+    expectEvalError(() => loadEvalSuite(invalid), "EVAL_VALIDATION_ERROR", [
+      invalid,
+      "Fix this YAML file",
+    ]);
+
+    const development = join(root, "development");
+    const wrongPartition = join(development, "holdout.yaml");
+    mkdirSync(development);
+    writeFileSync(
+      wrongPartition,
+      "id: wrong-partition\nname: Wrong partition\npartition: holdout\nprompt: Test\nassertions:\n  - type: exit-code\n    value: 0\n",
+    );
+    expectEvalError(() => loadEvalSuite(development), "EVAL_PARTITION_CONFLICT", [
+      wrongPartition,
+      "Change the file partition",
+    ]);
   });
 
   it("rejects unknown assertions and invalid regular expressions", () => {

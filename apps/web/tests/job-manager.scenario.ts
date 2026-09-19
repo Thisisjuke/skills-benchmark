@@ -37,7 +37,40 @@ describe("JobManager", () => {
       "started",
       "completed",
     ]);
+    expect(repository.getRunDetails("web-job-1")?.reports).toEqual([
+      expect.objectContaining({ path: "report.md", mediaType: "text/markdown" }),
+    ]);
     expect(existsSync(join(projectPath, ".skillbench", "web", "bundles", "web-job-1"))).toBe(true);
+    await manager.shutdown();
+  });
+
+  it("rejects a bundle when any referenced instruction fails integrity validation", async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "skillbench-web-invalid-bundle-"));
+    const cliPath = join(projectPath, "fake-cli.mjs");
+    writeFileSync(
+      cliPath,
+      fakeCliSource.replace(
+        "contentHash: hash(instructionBytes)",
+        'contentHash: "0".repeat(64)',
+      ),
+    );
+    const database = new WebDatabase(projectPath);
+    databases.push(database);
+    const repository = new WebRepository(database);
+    const manager = new JobManager({
+      projectPath,
+      repository,
+      cliPath,
+      id: () => "web-job-invalid",
+    });
+
+    manager.create({ command: "inspect", source: "./skill" });
+    const failed = await waitForTerminal(repository, "web-job-invalid");
+
+    expect(failed).toMatchObject({
+      status: "failed",
+      error: { message: expect.stringContaining("instructions/judge/instruction.md") },
+    });
     await manager.shutdown();
   });
 });
@@ -57,11 +90,16 @@ import { mkdirSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 const output = process.argv.at(-1);
 mkdirSync(join(output, "sources", "skill"), { recursive: true });
+mkdirSync(join(output, "instructions", "judge"), { recursive: true });
 const result = { schemaVersion: 1, type: "result", command: "inspect", data: { name: "demo" } };
 const resultBytes = Buffer.from(JSON.stringify(result));
 const skillBytes = Buffer.from("---\nname: demo\ndescription: demo\n---\n");
+const reportBytes = Buffer.from("# Skill inspection\n");
+const instructionBytes = Buffer.from("Review the result.");
 writeFileSync(join(output, "result.json"), resultBytes);
+writeFileSync(join(output, "report.md"), reportBytes);
 writeFileSync(join(output, "sources", "skill", "SKILL.md"), skillBytes);
+writeFileSync(join(output, "instructions", "judge", "instruction.md"), instructionBytes);
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const timestamp = new Date().toISOString();
 const manifest = {
@@ -82,8 +120,9 @@ const manifest = {
     fingerprintAlgorithm: "sha256-tree-v1",
     files: [{ path: "sources/skill/SKILL.md", contentHash: hash(skillBytes), sizeBytes: skillBytes.byteLength }],
   }],
-  reports: [],
+  reports: [{ id: "summary", path: "report.md", contentHash: hash(reportBytes), sizeBytes: reportBytes.byteLength, mediaType: "text/markdown" }],
   artifacts: [],
+  instructions: [{ id: "judge", path: "instructions/judge/instruction.md", sourcePath: ".skillbench/judge/instruction.md", contentHash: hash(instructionBytes), sizeBytes: instructionBytes.byteLength }],
 };
 writeFileSync(join(output, "manifest.json"), JSON.stringify(manifest));
 for (const event of [

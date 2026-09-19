@@ -38,7 +38,9 @@ import {
 } from "./options";
 
 export type CreateProgramOptions = {
+  createId?: () => string;
   jobId?: string;
+  now?: () => Date;
   signal?: AbortSignal;
   logger?: Logger;
   prompts?: PromptPort;
@@ -158,7 +160,10 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .name("skillbench")
     .description("Benchmark, compare and merge Agent Skills locally")
     .version(packageJson.version)
-    .option("-c, --config <path>", "path to a Skillbench YAML configuration file")
+    .option(
+      "-c, --config <path>",
+      "configuration file (canonical project path: .skillbench/config.yaml)",
+    )
     .option("--debug", "write diagnostic events and stacktraces to stderr")
     .option("--offline", "forbid network access and reject remote GitHub sources")
     .option("--runner <runner>", "registered execution runner identifier", runnerType)
@@ -171,7 +176,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .option("--no-input", "disable all interactive questions")
     .option("--no-history", "disable the local comparison history")
     .option("--jsonl", "stream versioned machine-readable events")
-    .option("-y, --yes", "accept a preflight whose values are already determined");
+    .option("-y, --yes", "accept the configured runner and determined preflight");
   program.configureHelp({ showGlobalOptions: true });
 
   program.action(async (_options, command: Command) => {
@@ -220,8 +225,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   const application: ApplicationContext = {
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     logger,
-    now: () => new Date(),
-    createId: () => crypto.randomUUID(),
+    now: options.now ?? (() => new Date()),
+    createId: options.createId ?? (() => crypto.randomUUID()),
     sourceService: sourceServiceFor,
     executionRuntime: executionRuntimeFor,
     recordComparison: (entry) => historyStore(entry.cwd).record(entry),
@@ -263,7 +268,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
 
   program.addHelpText(
     "after",
-    `\nExamples:\n  $ skillbench init\n  $ skillbench inspect ./skills/my-skill\n  $ skillbench eval ./skills/my-skill --evals evals/development\n  $ skillbench compare ./skill-a https://github.com/owner/repository/tree/main/skill-b --evals evals/development\n  $ skillbench merge ./skill-a ./skill-b --evals evals/development\n  $ skillbench history\n  $ skillbench doctor\n  $ skillbench inspect github:owner/repository/path/to/skill@main --json\n`,
+    `\nExamples:\n  $ skillbench init\n  $ skillbench inspect ./skills/my-skill\n  $ skillbench eval ./skills/my-skill --evals .skillbench/evals/development\n  $ skillbench compare ./skill-a https://github.com/owner/repository/tree/main/skill-b --evals .skillbench/evals/development\n  $ skillbench merge ./skill-a ./skill-b --evals .skillbench/evals/development\n  $ skillbench history\n  $ skillbench doctor\n  $ skillbench inspect github:owner/repository/path/to/skill@main --json\n`,
   );
   return program;
 }

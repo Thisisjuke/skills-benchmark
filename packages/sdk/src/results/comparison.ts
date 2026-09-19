@@ -37,7 +37,7 @@ const blindPairwiseResultSchema = z.strictObject({
   reverse: judgePassSchema,
 });
 
-const scopeSchema = z.strictObject({
+export const scopeSchema = z.strictObject({
   compatibility: z.enum(["HIGH", "PARTIAL", "LOW"]),
   confidence: scoreSchema,
   shared: z.array(z.string()),

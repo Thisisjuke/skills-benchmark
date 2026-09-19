@@ -1,7 +1,24 @@
-id: example
-name: Example evaluation
+# Each YAML file is one task used to score a skill. Keep development cases safe to
+# inspect and change while iterating; reserve holdout cases for final validation.
+id: create-release-checklist
+name: Create a release checklist
 partition: development
-prompt: Follow the installed skill and complete the requested task.
+
+# This is the task sent to the runner with the skill installed.
+prompt: |
+  Create a Markdown file named RELEASE_CHECKLIST.md with a "Release checklist"
+  heading and a checkbox reminding the reader to run the test suite.
+
+# Assertions turn observable results into a score. Replace this example with checks
+# that prove the behavior your own skill is meant to produce.
 assertions:
   - type: exit-code
     value: 0
+  - type: file-exists
+    value: RELEASE_CHECKLIST.md
+  - type: contains
+    path: RELEASE_CHECKLIST.md
+    value: "# Release checklist"
+  - type: contains
+    path: RELEASE_CHECKLIST.md
+    value: "- [ ] Run the test suite"

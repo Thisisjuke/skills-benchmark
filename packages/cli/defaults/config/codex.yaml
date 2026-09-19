@@ -11,3 +11,6 @@ eval:
 
 promptfoo:
   enabled: true
+
+outputs:
+  directory: {{outputsDirectory}}

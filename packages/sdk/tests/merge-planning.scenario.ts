@@ -222,7 +222,8 @@ describe("CapabilityExtractor", () => {
       b,
     );
     expect(plan.status).toBe("MERGE_NOT_RECOMMENDED");
-    expect(plan.reason).toContain("disjoint");
+    expect(plan.reason).toContain("different task categories");
+    expect(plan.reason).toContain("add development evals");
   });
 });
 
@@ -335,7 +336,7 @@ describe("StructuredCandidateGenerator", () => {
     );
     expect(() =>
       new StructuredCandidateGenerator({ template: MERGE_TEMPLATE }).generate(plan, a, b),
-    ).toThrow(/disjoint/u);
+    ).toThrow(/different task categories/u);
   });
 
   it("generates a merge summary without a persistence adapter", () => {

@@ -8,14 +8,19 @@ Promptfoo output assertion: it uses no network, token, or Codex process.
 From the monorepo root:
 
 ```sh
-vp run skillbench -- compare ./packages/cli/examples/basic/skills/concise ./packages/cli/examples/basic/skills/detailed --evals ./packages/cli/examples/basic/evals/development --repeat 1
-vp run skillbench -- merge ./packages/cli/examples/basic/skills/concise ./packages/cli/examples/basic/skills/detailed --evals ./packages/cli/examples/basic/evals/development --holdout ./packages/cli/examples/basic/evals/holdout --repeat 1
+vp run skillbench -- --config ./packages/cli/examples/basic/skillbench.yaml compare ./skills/concise ./skills/detailed --evals ./evals/development --repeat 1
+vp run skillbench -- --config ./packages/cli/examples/basic/skillbench.yaml merge ./skills/concise ./skills/detailed --evals ./evals/development --holdout ./evals/holdout --repeat 1
 ```
 
 The mock runner gives the parents and candidates identical results here. Because
-`merge.requireImprovement` is `true`, the expected result is `REJECTED` and the best
-parent remains the winner. No file is written implicitly: the complete result is sent
-to stdout. Add `--output ./result.skillbench` to materialize a portable bundle.
+`merge.requireImprovement` is `true`, the expected holdout result is `REJECTED` and the
+best parent remains the winner. Interactive runs are saved below this example's
+`.skillbench/runs/` directory. Open the generated `report.md` first; the merge bundle
+contains all candidates under `artifacts/candidates/` and the development winner under
+`artifacts/recommended/`, but no `artifacts/final/` because the holdout rejected it.
+
+Add `--no-output` for a transient interactive run, or
+`--output ./result.skillbench` for a stable bundle path relative to this example.
 
 To start over without modifying this source directory, copy it to a temporary
 directory:

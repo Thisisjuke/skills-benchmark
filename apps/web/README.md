@@ -35,6 +35,10 @@ npx @thisisjuke/skillbench init
 npx @thisisjuke/skillbench-web --project .
 ```
 
+The job form defaults to `.skillbench/evals/development`. It submits an explicit runner
+profile and always gives the CLI a temporary output destination, so Web jobs do not
+depend on interactive prompts or automatic CLI run paths.
+
 After publication:
 
 ```sh
@@ -54,11 +58,16 @@ project:
 
 ```text
 .skillbench/skillbench-web.sqlite
-.skillbench/web/bundles/<job-id>/
+.skillbench/web/bundles/<job-id>/report.md
+.skillbench/web/bundles/<job-id>/manifest.json
+.skillbench/web/bundles/<job-id>/result.json
 .skillbench/web/tmp/
 ```
 
-Jobs interrupted by shutdown are marked `interrupted` on the next startup.
+Each completed job keeps the full portable bundle. Start with `report.md` for the
+human-readable outcome; reports and merge artifacts referenced by the manifest are
+available from the job detail. Jobs interrupted by shutdown are marked `interrupted`
+on the next startup.
 
 ## Architecture
 
@@ -75,7 +84,9 @@ src/server.ts     skillbench-web command and lifecycle
 `JobManager` accepts only validated `inspect`, `eval`, `compare`, or `merge`
 requests. It builds the argv itself, adds `--no-input --no-history --jsonl --yes`,
 requires a temporary bundle, validates its hashes, then moves it into durable storage.
-No arbitrary argv from the browser is executed.
+The result, source files, reports, artifacts, and model-facing instructions must all
+match their manifest references before the job is persisted. No arbitrary argv from
+the browser is executed.
 
 Command identifiers, automation requests, the JSONL protocol, and bundle schemas come
 from the public `@thisisjuke/skillbench/contracts` entrypoints. The backend locates the

@@ -6,6 +6,7 @@ import {
   scoreSchema,
   timestampSchema,
 } from "./shared";
+import { scopeSchema } from "./comparison";
 
 const mergeEvidenceSchema = z.strictObject({
   source: z.enum(["development", "static-analysis"]),
@@ -112,12 +113,14 @@ const mergeCandidateResultSchema = z.strictObject({
 
 const mergeNotRecommendedResultSchema = z.strictObject({
   comparisonReused: z.boolean(),
+  scope: scopeSchema,
   plan: mergePlanSchema.refine((plan) => plan.status === "MERGE_NOT_RECOMMENDED"),
   instructionAssets: z.array(instructionAssetReferenceSchema).optional(),
 });
 
 const mergeCompletedResultSchema = z.strictObject({
   comparisonReused: z.boolean(),
+  scope: scopeSchema,
   runId: identifierSchema,
   comparisonId: identifierSchema,
   plan: mergePlanSchema.refine((plan) => plan.status === "RECOMMENDED"),

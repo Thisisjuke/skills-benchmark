@@ -103,6 +103,16 @@ export const skillbenchBundleManifestSchema = z
       }
       seen.add(path);
     }
+    const primaryReports = manifest.reports.filter(
+      (report) => report.id === "summary" && report.path === "report.md",
+    );
+    if (primaryReports.length !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "Bundle must declare exactly one summary report at report.md",
+        path: ["reports"],
+      });
+    }
   });
 
 export const skillbenchBundleDocumentSchema = z

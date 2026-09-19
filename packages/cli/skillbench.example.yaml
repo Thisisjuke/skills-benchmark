@@ -1,3 +1,5 @@
+# Copy the settings you need into .skillbench/config.yaml. Skillbench discovers that
+# canonical path from the current directory or any of its descendants.
 runner:
   type: codex
   executable: codex
@@ -33,6 +35,10 @@ merge:
 
 reports:
   markdown: true
+
+outputs:
+  # Interactive operations create unique bundles below this project-relative directory.
+  directory: .skillbench/runs
 
 sources:
   timeoutMs: 30000

@@ -30,7 +30,7 @@ export function createClaudeExecutionProfile(input: {
   ];
   if (missing.length > 0) {
     throw new SkillbenchError(
-      `Claude execution requires an explicit ${missing.join(" and ")} in skillbench.yaml`,
+      `Claude execution requires an explicit ${missing.join(" and ")} in .skillbench/config.yaml`,
       { code: "CLAUDE_PROFILE_REQUIRED" },
     );
   }

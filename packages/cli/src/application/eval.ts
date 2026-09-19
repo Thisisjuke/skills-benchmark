@@ -6,6 +6,7 @@ import {
 } from "@skillbench/sdk/evaluator";
 import { createRunnerPermissions } from "@skillbench/sdk/runners";
 import type { InstructionAssetReference } from "@skillbench/sdk/results";
+import { renderEvaluationBundleReport } from "@skillbench/sdk/reports";
 import type { ResolveOptions } from "@skillbench/sdk/sources";
 import { isAbsolute, resolve } from "node:path";
 
@@ -38,8 +39,9 @@ export async function executeEval(
   context: ApplicationContext,
   request: EvalRequest,
 ): Promise<EvalOperationResult> {
+  const evalsPath = projectPath(request.projectRoot, request.evals);
   const suite = loadEvalSuite(
-    projectPath(request.projectRoot, request.evals),
+    evalsPath,
     request.partition === undefined ? {} : { partition: request.partition },
   );
   const resolvedSkill = await request.events.progress("Resolving source", () =>
@@ -68,7 +70,7 @@ export async function executeEval(
       operation: "eval",
       skills: [resolvedSkill],
       suite,
-      suiteInput: request.evals,
+      suiteInput: evalsPath,
       repeat,
       executionProfile: runtime.executionProfile,
       ...(request.output === undefined ? {} : { output: request.output }),
@@ -100,6 +102,7 @@ export async function executeEval(
           output: request.output,
           result,
           sources: [{ role: "skill", skill: resolvedSkill }],
+          reportMarkdown: renderEvaluationBundleReport(result),
           instructionAssets: [],
           force: request.force === true,
         });

@@ -8,6 +8,7 @@ import {
   initializedProjectConflicts,
   type InitResult,
 } from "../init";
+import { DEFAULT_RUNS_DIRECTORY } from "../config";
 import type { ExecutionCommandContext } from "./command-context";
 import type { PromptSession } from "./interactive";
 import type { GlobalOptions } from "./options";
@@ -28,11 +29,20 @@ export async function initializeProjectFlow(input: {
     );
   }
   const profile = await input.session.initializationRunnerChoice(input.global);
+  const outputsDirectory = await input.session.value(
+    undefined,
+    "Where should Skillbench save its runs?",
+    DEFAULT_RUNS_DIRECTORY,
+  );
   await input.session.confirmInitialization(
     projectRoot,
     INITIALIZED_PROJECT_FILES.map(
       (file) => `${file.path} — ${file.description}`,
     ),
   );
-  return initializeProject(projectRoot, { force: input.force, profile });
+  return initializeProject(projectRoot, {
+    force: input.force,
+    profile,
+    outputsDirectory,
+  });
 }

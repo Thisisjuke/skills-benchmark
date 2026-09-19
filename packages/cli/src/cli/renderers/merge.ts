@@ -8,7 +8,13 @@ export function renderMergeResult(input: {
 }): string {
   const { result, bundle } = input.operation;
   if (!("runId" in result)) {
-    return `Merge not recommended: ${result.plan.reason}${bundle === undefined ? "" : `\nBundle: ${bundle.path}`}\n`;
+    return `${[
+      "No merged skill was generated.",
+      result.plan.reason,
+      `Comparison: ${result.comparisonReused ? "reused" : "created"}`,
+      "Next: keep the skills separate, narrow them to a shared responsibility, or add evals for a shared task.",
+      ...(bundle === undefined ? [] : [`Report: ${bundle.reportPath}`, `Bundle: ${bundle.path}`]),
+    ].join("\n")}\n`;
   }
   return `${[
     "Merge complete",
@@ -27,8 +33,6 @@ export function renderMergeResult(input: {
           `Winner: ${result.holdoutValidation.verdict.winnerId}`,
           `Reason: ${result.holdoutValidation.verdict.reason}`,
         ]),
-    ...(bundle === undefined
-      ? ["Artifacts: not written. Save next time with: --output ./results/merge.skillbench"]
-      : [`Bundle: ${bundle.path}`]),
+    ...(bundle === undefined ? [] : [`Report: ${bundle.reportPath}`, `Bundle: ${bundle.path}`]),
   ].join("\n")}\n`;
 }

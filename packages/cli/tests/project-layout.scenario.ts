@@ -16,6 +16,11 @@ describe("project layout", () => {
     configurePromptfooEnvironment(layout, environment);
 
     expect(layout.state).toBe(join(layout.root, ".skillbench"));
+    expect(layout.config).toBe(join(layout.root, ".skillbench", "config.yaml"));
+    expect(layout.runs).toBe(join(layout.root, ".skillbench", "runs"));
+    expect(layout.evals.development).toBe(
+      join(layout.root, ".skillbench", "evals", "development"),
+    );
     expect(environment).toMatchObject({
       PROMPTFOO_CONFIG_DIR: join(layout.root, ".skillbench", "promptfoo"),
       PROMPTFOO_CACHE_PATH: join(layout.root, ".skillbench", "promptfoo", "cache"),

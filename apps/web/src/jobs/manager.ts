@@ -173,6 +173,7 @@ function readAndValidateBundle(
     ...manifest.sources.flatMap((source) => source.files),
     ...manifest.reports,
     ...manifest.artifacts,
+    ...manifest.instructions,
   ];
   for (const reference of references) validateFile(directory, reference);
   return { manifest, result };

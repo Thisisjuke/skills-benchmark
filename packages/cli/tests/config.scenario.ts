@@ -2,10 +2,16 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
 import { loadConfig } from "../src/config";
+
+function writeConfig(cwd: string, content: string): void {
+  mkdirSync(join(cwd, ".skillbench"), { recursive: true });
+  writeFileSync(join(cwd, ".skillbench", "config.yaml"), content);
+}
 
 describe("loadConfig", () => {
   it("resolves safe defaults relative to the working directory", () => {
@@ -31,14 +37,15 @@ describe("loadConfig", () => {
       maxSnapshotSizeBytes: 25 * 1024 * 1024,
     });
     expect(config.reports).toEqual({ markdown: true });
+    expect(config.outputs).toEqual({ directory: ".skillbench/runs" });
   });
 
   it("loads YAML overrides and reports the invalid field", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(join(cwd, "skillbench.yaml"), "eval:\n  repeat: 5\n");
+    writeConfig(cwd, "eval:\n  repeat: 5\n");
     expect(loadConfig({ cwd }).config.eval.repeat).toBe(5);
 
-    writeFileSync(join(cwd, "skillbench.yaml"), "eval:\n  repeat: 0\n");
+    writeConfig(cwd, "eval:\n  repeat: 0\n");
     expect(() => loadConfig({ cwd })).toThrow(/eval\.repeat/);
   });
 
@@ -46,28 +53,28 @@ describe("loadConfig", () => {
     const root = mkdtempSync(join(tmpdir(), "skillbench-config-root-"));
     const nested = join(root, "skills", "example");
     mkdirSync(nested, { recursive: true });
-    writeFileSync(join(root, "skillbench.yaml"), "eval:\n  repeat: 5\n");
+    writeConfig(root, "eval:\n  repeat: 5\n");
 
     const loaded = loadConfig({ cwd: nested });
 
     expect(loaded.projectRoot).toBe(root);
-    expect(loaded.configFile).toBe(join(root, "skillbench.yaml"));
+    expect(loaded.configFile).toBe(join(root, ".skillbench", "config.yaml"));
     expect(loaded.config.eval.repeat).toBe(5);
   });
 
   it("rejects unknown configuration keys", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(join(cwd, "skillbench.yaml"), "server:\n  port: 3000\n");
+    writeConfig(cwd, "server:\n  port: 3000\n");
     expect(() => loadConfig({ cwd })).toThrow(/server/);
 
-    writeFileSync(join(cwd, "skillbench.yaml"), "storage:\n  path: obsolete.sqlite\n");
+    writeConfig(cwd, "storage:\n  path: obsolete.sqlite\n");
     expect(() => loadConfig({ cwd })).toThrow(/storage/);
   });
 
   it("validates Codex runner process controls", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(
-      join(cwd, "skillbench.yaml"),
+    writeConfig(
+      cwd,
       "runner:\n  type: codex\n  model: gpt-example\n  reasoningEffort: high\n  sandbox: read-only\n  maxOutputBytes: 2048\n",
     );
     expect(loadConfig({ cwd }).config.runner).toMatchObject({
@@ -77,17 +84,17 @@ describe("loadConfig", () => {
       maxOutputBytes: 2048,
     });
 
-    writeFileSync(join(cwd, "skillbench.yaml"), "runner:\n  sandbox: danger-full-access\n");
+    writeConfig(cwd, "runner:\n  sandbox: danger-full-access\n");
     expect(() => loadConfig({ cwd })).toThrow(/runner\.sandbox/u);
 
-    writeFileSync(join(cwd, "skillbench.yaml"), "runner:\n  reasoningEffort: extreme\n");
+    writeConfig(cwd, "runner:\n  reasoningEffort: extreme\n");
     expect(() => loadConfig({ cwd })).toThrow(/runner\.reasoningEffort/u);
   });
 
   it("selects Claude defaults and validates its effort levels", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(
-      join(cwd, "skillbench.yaml"),
+    writeConfig(
+      cwd,
       "runner:\n  type: claude\n  model: claude-sonnet-4-6\n  reasoningEffort: max\n",
     );
     expect(loadConfig({ cwd }).config.runner).toMatchObject({
@@ -97,8 +104,8 @@ describe("loadConfig", () => {
       reasoningEffort: "max",
     });
 
-    writeFileSync(
-      join(cwd, "skillbench.yaml"),
+    writeConfig(
+      cwd,
       "runner:\n  type: claude\n  reasoningEffort: minimal\n",
     );
     expect(() => loadConfig({ cwd })).toThrow(/Claude effort/u);
@@ -106,19 +113,19 @@ describe("loadConfig", () => {
 
   it("can disable the pinned Promptfoo assertion adapter explicitly", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(join(cwd, "skillbench.yaml"), "promptfoo:\n  enabled: false\n");
+    writeConfig(cwd, "promptfoo:\n  enabled: false\n");
     expect(loadConfig({ cwd }).config.promptfoo).toEqual({ enabled: false });
-    writeFileSync(join(cwd, "skillbench.yaml"), "promptfoo:\n  version: 0.121.0\n");
+    writeConfig(cwd, "promptfoo:\n  version: 0.121.0\n");
     expect(() => loadConfig({ cwd })).toThrow(/promptfoo.*version/u);
   });
 
   it("rejects comparison weights that are not normalized or functionally dominant", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
-    writeFileSync(join(cwd, "skillbench.yaml"), "comparison:\n  weights:\n    latency: 0.10\n");
+    writeConfig(cwd, "comparison:\n  weights:\n    latency: 0.10\n");
     expect(() => loadConfig({ cwd })).toThrow(/sum to 1/u);
 
-    writeFileSync(
-      join(cwd, "skillbench.yaml"),
+    writeConfig(
+      cwd,
       [
         "comparison:",
         "  weights:",
@@ -133,5 +140,47 @@ describe("loadConfig", () => {
       ].join("\n"),
     );
     expect(() => loadConfig({ cwd })).toThrow(/functionalCorrectness/u);
+  });
+
+  it("ignores root-level legacy configs unless explicitly selected", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-legacy-"));
+    writeFileSync(join(cwd, "skillbench.yaml"), "eval:\n  repeat: 5\n");
+
+    expect(loadConfig({ cwd }).configFile).toBeUndefined();
+    expect(loadConfig({ cwd }).config.eval.repeat).toBe(3);
+    expect(loadConfig({ cwd, configPath: "skillbench.yaml" })).toMatchObject({
+      configFile: join(cwd, "skillbench.yaml"),
+      projectRoot: cwd,
+      config: { eval: { repeat: 5 } },
+    });
+  });
+
+  it("accepts a configured run directory and rejects an empty value", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-output-"));
+    writeConfig(cwd, "outputs:\n  directory: artifacts/runs\n");
+    expect(loadConfig({ cwd }).config.outputs.directory).toBe("artifacts/runs");
+
+    writeConfig(cwd, "outputs:\n  directory: '   '\n");
+    expect(() => loadConfig({ cwd })).toThrow(/outputs\.directory/u);
+  });
+
+  it("keeps the published and offline example configurations loadable", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-examples-"));
+    const published = loadConfig({
+      cwd,
+      configPath: fileURLToPath(new URL("../skillbench.example.yaml", import.meta.url)),
+    });
+    const offline = loadConfig({
+      cwd,
+      configPath: fileURLToPath(
+        new URL("../examples/basic/skillbench.yaml", import.meta.url),
+      ),
+    });
+
+    expect(published.config.outputs.directory).toBe(".skillbench/runs");
+    expect(offline.config).toMatchObject({
+      runner: { type: "mock" },
+      outputs: { directory: ".skillbench/runs" },
+    });
   });
 });

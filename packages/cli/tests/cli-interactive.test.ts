@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -14,7 +14,7 @@ import {
 } from "../src/cli/interactive";
 import { estimateModelCalls } from "../src/application";
 import { renderPreflight } from "../src/cli/renderers";
-import { loadConfig } from "../src/config";
+import { loadConfig, skillbenchConfigSchema } from "../src/config";
 import { loadEvalSuite } from "@skillbench/sdk/evaluator";
 import { LocalSourceResolver } from "@skillbench/sdk/sources/local";
 import { CliHistoryStore } from "../src/history";
@@ -72,6 +72,17 @@ function config() {
   return loadConfig({ cwd: mkdtempSync(join(tmpdir(), "skillbench-interactive-")) }).config;
 }
 
+function configuredCodex() {
+  return skillbenchConfigSchema.parse({
+    runner: {
+      type: "codex",
+      model: "gpt-configured",
+      reasoningEffort: "medium",
+      sandbox: "workspace-write",
+    },
+  });
+}
+
 async function mockPreflight() {
   const policy = { maxFileSizeBytes: 1_000_000, maxSnapshotSizeBytes: 5_000_000 };
   const skill = await new LocalSourceResolver(policy).resolve("tests/fixtures/skills/basic");
@@ -79,7 +90,7 @@ async function mockPreflight() {
     operation: "eval" as const,
     skills: [skill],
     suite: loadEvalSuite("tests/fixtures/evals/development"),
-    suiteInput: "tests/fixtures/evals/development",
+    suiteInput: resolve("tests/fixtures/evals/development"),
     repeat: 1,
     executionProfile: { runner: "mock" as const, runnerVersion: "mock-v1" },
   };
@@ -88,7 +99,7 @@ async function mockPreflight() {
 describe("interactive CLI contracts", () => {
   it("initializes an incomplete project and resumes the requested comparison", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-interactive-resume-"));
-    const prompts = new ScriptedPrompts(["mock", true, false, true]);
+    const prompts = new ScriptedPrompts(["mock", ".skillbench/runs", true, true]);
     const output: string[] = [];
 
     await createProgram({
@@ -110,7 +121,8 @@ describe("interactive CLI contracts", () => {
     ]);
 
     expect(output.join("")).toContain("Comparison complete");
-    expect(existsSync(join(cwd, "skillbench", "assets.yaml"))).toBe(true);
+    expect(existsSync(join(cwd, ".skillbench", "assets.yaml"))).toBe(true);
+    expect(loadConfig({ cwd }).config.outputs.directory).toBe(".skillbench/runs");
     expect(prompts.calls.filter((call) => call === "select:Which runner should be used?")).toEqual(
       [],
     );
@@ -134,6 +146,163 @@ describe("interactive CLI contracts", () => {
       reasoningEffort: "xhigh",
     });
     expect(prompts.calls).toEqual([]);
+  });
+
+  it("accepts a complete configured runner with one compact confirmation", async () => {
+    const prompts = new ScriptedPrompts([true]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+
+    await expect(session.runnerChoice(configuredCodex(), {})).resolves.toEqual({
+      runner: "codex",
+      model: "gpt-configured",
+      reasoningEffort: "medium",
+    });
+    expect(prompts.calls).toEqual([
+      "confirm:Use configured runner?\nCodex · gpt-configured · medium · workspace-write",
+    ]);
+  });
+
+  it("opens the detailed runner selection after declining the configured profile", async () => {
+    const configured = configuredCodex();
+    const before = structuredClone(configured);
+    const prompts = new ScriptedPrompts([false, "claude", "claude-sonnet-4-6", "max"]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+
+    await expect(session.runnerChoice(configured, {})).resolves.toEqual({
+      runner: "claude",
+      model: "claude-sonnet-4-6",
+      reasoningEffort: "max",
+    });
+    expect(prompts.calls).toEqual([
+      "confirm:Use configured runner?\nCodex · gpt-configured · medium · workspace-write",
+      "select:Which runner should be used?",
+      "text:Which Claude model should be used?",
+      "select:Which reasoning effort should be used?",
+    ]);
+    expect(configured).toEqual(before);
+  });
+
+  it("accepts the configured runner without prompting for --yes and no-input", async () => {
+    for (const options of [
+      { interactive: true, yes: true },
+      { interactive: false, yes: false },
+    ]) {
+      const prompts = new ScriptedPrompts([]);
+      const session = new PromptSession({ ...options, prompts });
+
+      await expect(session.runnerChoice(configuredCodex(), {})).resolves.toEqual({
+        runner: "codex",
+        model: "gpt-configured",
+        reasoningEffort: "medium",
+      });
+      expect(prompts.calls).toEqual([]);
+    }
+  });
+
+  it("initializes through inspect then reuses that runner for compare", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-inspect-compare-runner-"));
+    const inspectPrompts = new ScriptedPrompts(["mock", ".skillbench/runs", true]);
+
+    await createProgram({
+      prompts: inspectPrompts,
+      stdinIsTTY: true,
+      stderrIsTTY: true,
+      writeStdout: () => undefined,
+      services: { cwd: () => cwd },
+    }).parseAsync([
+      "node",
+      "skillbench",
+      "inspect",
+      resolve("tests/fixtures/skills/basic"),
+    ]);
+
+    const evals = resolve("tests/fixtures/evals/development");
+    const comparePrompts = new ScriptedPrompts([true, true]);
+    await createProgram({
+      prompts: comparePrompts,
+      stdinIsTTY: true,
+      stderrIsTTY: true,
+      writeStdout: () => undefined,
+      services: { cwd: () => cwd },
+    }).parseAsync([
+      "node",
+      "skillbench",
+      "compare",
+      resolve("tests/fixtures/skills/basic"),
+      resolve("tests/fixtures/skills/basic"),
+      "--evals",
+      evals,
+      "--repeat",
+      "1",
+    ]);
+
+    expect(comparePrompts.calls).toContain(
+      "confirm:Use configured runner?\nMock · workspace-write",
+    );
+    expect(comparePrompts.calls).not.toContain("select:Which runner should be used?");
+    expect(comparePrompts.calls).not.toContain("text:Which Mock model should be used?");
+  });
+
+  it("does not persist a runner selected after declining the configured profile", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-runner-override-"));
+    initializeProject(cwd, {
+      profile: {
+        runner: "codex",
+        model: "gpt-configured",
+        reasoningEffort: "medium",
+      },
+    });
+    const configPath = join(cwd, ".skillbench", "config.yaml");
+    const before = readFileSync(configPath, "utf8");
+    const prompts = new ScriptedPrompts([false, "mock", true]);
+
+    await createProgram({
+      prompts,
+      stdinIsTTY: true,
+      stderrIsTTY: true,
+      writeStdout: () => undefined,
+      services: { cwd: () => cwd },
+    }).parseAsync([
+      "node",
+      "skillbench",
+      "eval",
+      resolve("tests/fixtures/skills/basic"),
+      "--evals",
+      resolve("tests/fixtures/evals/development"),
+      "--repeat",
+      "1",
+      "--no-output",
+    ]);
+
+    expect(readFileSync(configPath, "utf8")).toBe(before);
+    expect(prompts.calls).toContain("select:Which runner should be used?");
+  });
+
+  it("explains what an eval suite contains when requesting its path", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-eval-prompt-"));
+    initializeProject(cwd);
+    const evals = resolve("tests/fixtures/evals/development");
+    const prompts = new ScriptedPrompts([true, evals, true]);
+
+    await createProgram({
+      prompts,
+      stdinIsTTY: true,
+      stderrIsTTY: true,
+      writeStdout: () => undefined,
+      services: { cwd: () => cwd },
+    }).parseAsync([
+      "node",
+      "skillbench",
+      "eval",
+      resolve("tests/fixtures/skills/basic"),
+      "--repeat",
+      "1",
+      "--no-output",
+    ]);
+
+    expect(prompts.calls).toContain(
+      "text:Which eval YAML file or directory defines the tasks and assertions used to score this skill?",
+    );
   });
 
   it("collects sources and a Codex profile interactively", async () => {
@@ -271,6 +440,9 @@ describe("interactive CLI contracts", () => {
     const output: string[] = [];
     const selectingPrompts = new ScriptedPrompts([
       "inspect",
+      "mock",
+      ".skillbench/runs",
+      true,
       resolve("tests/fixtures/skills/basic"),
     ]);
     await createProgram({
@@ -282,6 +454,10 @@ describe("interactive CLI contracts", () => {
     }).parseAsync(["node", "skillbench"]);
     expect(selectingPrompts.calls).toEqual([
       "select:What would you like to do?",
+      "select:Which runner should this project use by default?",
+      "text:Where should Skillbench save its runs?",
+      "note:Project initialization",
+      "confirm:Create these project files?",
       "text:Which skill should be inspected (path or GitHub URL)?",
       "progress:Resolving source",
     ]);
@@ -290,6 +466,7 @@ describe("interactive CLI contracts", () => {
       selectingPrompts.selections[0]?.options.find((option) => option.value === "init")?.hint,
     ).toContain("Recommended");
     expect(output.join("")).toContain("Name: basic-skill");
+    expect(existsSync(join(cwd, ".skillbench", "config.yaml"))).toBe(true);
 
     const prompts = new ScriptedPrompts([]);
     prompts.select = async (input) => {
@@ -401,7 +578,7 @@ describe("interactive CLI contracts", () => {
       "id: history\nname: history\npartition: development\nprompt: test\nassertions:\n  - type: exit-code\n    value: 0\n",
     );
     initializeProject(cwd);
-    const prompts = new ScriptedPrompts(["mock", false, true]);
+    const prompts = new ScriptedPrompts([true, true]);
     await createProgram({
       prompts,
       stdinIsTTY: true,
@@ -426,6 +603,7 @@ describe("interactive CLI contracts", () => {
       repeat: 1,
       evals,
     });
+    expect(new CliHistoryStore(cwd).list()[0]?.output).toBeUndefined();
   });
 
   it("disambiguates identical history sources with suite, runner and run metadata", async () => {
@@ -490,7 +668,7 @@ describe("preflight", () => {
       operation: "compare" as const,
       skills: [skill, skill],
       suite,
-      suiteInput: "tests/fixtures/evals/development",
+      suiteInput: resolve("tests/fixtures/evals/development"),
       repeat: 2,
       executionProfile,
     };
@@ -499,7 +677,11 @@ describe("preflight", () => {
     expect(estimateModelCalls({ ...comparison, operation: "merge", candidateCount: 3 })).toBe(12);
     const preflight = renderPreflight(comparison).join("\n");
     expect(preflight).toContain("Runner: Codex · gpt-cheap · low effort");
-    expect(preflight).toContain("Eval suite: tests/fixtures/evals/development");
+    expect(preflight).toContain(`Eval suite: ${resolve("tests/fixtures/evals/development")}`);
+    expect(preflight).toContain("Partition: development");
+    expect(preflight).toContain("Cases: 1");
+    expect(preflight).toContain("Repeats: 2");
+    expect(preflight).toContain("Estimated model calls: 6");
     expect(preflight).toContain(skill.snapshot.fingerprint.slice(0, 12));
     expect(preflight).not.toContain(skill.snapshot.fingerprint);
     expect(

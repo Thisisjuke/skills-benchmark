@@ -1,4 +1,5 @@
 import { inspectSkill, type InspectResult } from "@skillbench/sdk/inspect";
+import { renderInspectBundleReport } from "@skillbench/sdk/reports";
 import type { ResolveOptions } from "@skillbench/sdk/sources";
 
 import type { ApplicationContext, OperationEvents, OutputRequest } from "./context";
@@ -43,6 +44,10 @@ export async function executeInspect(
           output: request.output,
           result,
           sources: [{ role: "skill", skill: resolved }],
+          reportMarkdown: renderInspectBundleReport({
+            result,
+            metadata: resolved.skill.metadata,
+          }),
           force: request.force === true,
         });
   return { result, ...(bundle === undefined ? {} : { bundle }) };

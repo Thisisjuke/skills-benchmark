@@ -51,6 +51,13 @@ const manifest = {
   ],
   reports: [
     {
+      id: "summary",
+      path: "report.md",
+      contentHash: "8".repeat(64),
+      sizeBytes: 180,
+      mediaType: "text/markdown",
+    },
+    {
       id: "report-1",
       path: "reports/comparison.md",
       contentHash: "4".repeat(64),
@@ -114,6 +121,15 @@ describe("Skillbench bundle contract", () => {
   it("accepts bundles only for portable business operations", () => {
     expect(
       skillbenchBundleManifestSchema.safeParse({ ...manifest, command: "history" }).success,
+    ).toBe(false);
+  });
+
+  it("requires one root summary report", () => {
+    expect(
+      skillbenchBundleManifestSchema.safeParse({
+        ...manifest,
+        reports: manifest.reports.filter((report) => report.path !== "report.md"),
+      }).success,
     ).toBe(false);
   });
 });

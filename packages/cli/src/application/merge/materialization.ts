@@ -5,6 +5,7 @@ import type {
   PreparedMerge,
 } from "@skillbench/sdk/merger";
 import { mergeResultSchema, type MergeResult } from "@skillbench/sdk/results";
+import { renderMergeBundleReport } from "@skillbench/sdk/reports";
 import type { ResolvedSkill } from "@skillbench/sdk/skills";
 
 import type { ApplicationContext } from "../context";
@@ -23,6 +24,7 @@ export function materializeMergeNotRecommended(input: {
 }): { result: MergeResult; bundle?: WrittenBundle } {
   const result = mergeResultSchema.parse({
     comparisonReused: input.planning.comparisonReused,
+    scope: input.planning.comparison.scope,
     plan: input.planning.plan,
     instructionAssets: input.instructionAssets.map(assetReference),
   });
@@ -45,6 +47,7 @@ export function materializeCompletedMerge(input: {
 }): { result: MergeResult; bundle?: WrittenBundle } {
   const result = mergeResultSchema.parse({
     comparisonReused: input.planning.comparisonReused,
+    scope: input.planning.comparison.scope,
     runId: input.generation.runId,
     comparisonId: input.generation.comparisonId,
     plan: input.generation.plan,
@@ -66,13 +69,25 @@ export function materializeCompletedMerge(input: {
       provenance: candidate.provenance,
     })),
   });
-  const acceptedSkill =
-    input.holdoutValidation?.verdict.winnerKind === "candidate"
+  const finalSkill =
+    input.holdoutValidation?.verdict.status === "ACCEPTED" &&
+    input.holdoutValidation.verdict.winnerKind === "candidate"
       ? input.generation.candidates.find(
           (candidate) => candidate.id === input.holdoutValidation?.verdict.winnerId,
         )
       : undefined;
-  const bundle = writeMergeBundle({ ...input, result, acceptedSkill });
+  const recommendedSkill = input.generation.candidates.find(
+    (candidate) => candidate.id === input.tournament.selectedCandidateIds[0],
+  );
+  if (recommendedSkill === undefined) {
+    throw new Error("Development tournament selected an unknown merge candidate");
+  }
+  const bundle = writeMergeBundle({
+    ...input,
+    result,
+    recommendedSkill,
+    finalSkill,
+  });
   return { result, ...(bundle === undefined ? {} : { bundle }) };
 }
 
@@ -94,7 +109,9 @@ function writeMergeBundle(input: {
   skillA: ResolvedSkill;
   skillB: ResolvedSkill;
   instructionAssets: readonly ProjectAsset[];
-  acceptedSkill?: Parameters<ApplicationContext["writeBundle"]>[0]["acceptedSkill"];
+  generation?: MergeGenerationSummary;
+  recommendedSkill?: Parameters<ApplicationContext["writeBundle"]>[0]["recommendedSkill"];
+  finalSkill?: Parameters<ApplicationContext["writeBundle"]>[0]["finalSkill"];
 }): WrittenBundle | undefined {
   if (input.output === undefined) return undefined;
   return input.context.writeBundle({
@@ -106,7 +123,12 @@ function writeMergeBundle(input: {
       { role: "A", skill: input.skillA },
       { role: "B", skill: input.skillB },
     ],
-    ...(input.acceptedSkill === undefined ? {} : { acceptedSkill: input.acceptedSkill }),
+    reportMarkdown: renderMergeBundleReport(input.result),
+    ...(input.generation === undefined ? {} : { candidates: input.generation.candidates }),
+    ...(input.recommendedSkill === undefined
+      ? {}
+      : { recommendedSkill: input.recommendedSkill }),
+    ...(input.finalSkill === undefined ? {} : { finalSkill: input.finalSkill }),
     instructionAssets: input.instructionAssets,
     force: input.force,
   });

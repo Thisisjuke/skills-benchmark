@@ -1,6 +1,6 @@
 {
   "name": "@thisisjuke/skillbench-web",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local persistent Web interface for Skillbench",
   "homepage": "https://github.com/Thisisjuke/skills-benchmark/tree/main/apps/web#readme",
   "bugs": {

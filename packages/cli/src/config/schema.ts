@@ -126,6 +126,14 @@ const reportsSchema = z
   })
   .strict();
 
+export const DEFAULT_RUNS_DIRECTORY = ".skillbench/runs";
+
+const outputsSchema = z
+  .object({
+    directory: z.string().trim().min(1).default(DEFAULT_RUNS_DIRECTORY),
+  })
+  .strict();
+
 const sourcesSchema = z
   .object({
     timeoutMs: z.number().int().min(1).default(30_000),
@@ -170,6 +178,7 @@ export const skillbenchConfigSchema = z
     promptfoo: promptfooSchema.default({ enabled: true }),
     merge: mergeSchema.default({ candidates: 3, requireImprovement: true, minimumImprovement: 0 }),
     reports: reportsSchema.default({ markdown: true }),
+    outputs: outputsSchema.default({ directory: DEFAULT_RUNS_DIRECTORY }),
     sources: sourcesSchema.default({
       timeoutMs: 30_000,
       maxFileSizeBytes: 2 * 1024 * 1024,

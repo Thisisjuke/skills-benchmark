@@ -88,6 +88,16 @@ export class PromptSession {
 
   async runnerChoice(config: SkillbenchConfig, flags: InteractiveFlags): Promise<RunnerChoice> {
     const hasProfileFlag = flags.model !== undefined || flags.reasoningEffort !== undefined;
+    const hasOverride = flags.runner !== undefined || hasProfileFlag;
+    const configuredChoice = configuredRunnerChoice(config);
+    if (!hasOverride && configuredChoice !== undefined) {
+      if (!this.options.interactive || this.options.yes) return configuredChoice;
+      const accepted = await this.options.prompts.confirm({
+        message: `Use configured runner?\n${configuredRunnerLabel(config, configuredChoice)}`,
+        initialValue: true,
+      });
+      if (accepted) return configuredChoice;
+    }
     const runner: RunnerType =
       flags.runner ??
       (hasProfileFlag
@@ -227,17 +237,6 @@ export class PromptSession {
     return raw;
   }
 
-  async output(supplied: string | undefined, suggested: string): Promise<string | undefined> {
-    if (supplied !== undefined) return supplied;
-    if (!this.options.interactive) return undefined;
-    const save = await this.options.prompts.confirm({
-      message: "Save a portable result bundle?",
-      initialValue: false,
-    });
-    if (!save) return undefined;
-    return this.value(undefined, "Where should the result bundle be written?", suggested);
-  }
-
   async confirmInitialization(projectRoot: string, files: readonly string[]): Promise<void> {
     if (!this.options.interactive) return;
     this.options.prompts.note(
@@ -287,6 +286,28 @@ export class PromptSession {
     this.options.onProgress?.(message);
     return this.options.interactive ? this.options.prompts.progress(message, task) : task();
   }
+}
+
+function configuredRunnerChoice(config: SkillbenchConfig): RunnerChoice | undefined {
+  const definition = runnerDefinition(config.runner.type);
+  if (
+    definition.efforts.length > 0 &&
+    (config.runner.model === undefined || config.runner.reasoningEffort === undefined)
+  ) {
+    return undefined;
+  }
+  return definition.createChoice(config.runner.model, config.runner.reasoningEffort);
+}
+
+function configuredRunnerLabel(config: SkillbenchConfig, choice: RunnerChoice): string {
+  return [
+    runnerDefinition(choice.runner).name,
+    choice.model,
+    choice.reasoningEffort,
+    config.runner.sandbox,
+  ]
+    .filter((value): value is string => value !== undefined)
+    .join(" · ");
 }
 
 export function createClackPromptPort(input: Readable, output: Writable): PromptPort {

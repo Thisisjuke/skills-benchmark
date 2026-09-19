@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 import * as z from "zod";
@@ -34,7 +34,12 @@ function findConfigFile(cwd: string, explicitPath?: string): string | undefined 
 export function loadConfig(options: LoadConfigOptions = {}): LoadedConfig {
   const cwd = resolve(options.cwd ?? process.cwd());
   const configFile = findConfigFile(cwd, options.configPath);
-  const projectRoot = configFile === undefined ? cwd : dirname(configFile);
+  const projectRoot =
+    configFile === undefined
+      ? cwd
+      : isCanonicalConfigPath(configFile)
+        ? dirname(dirname(configFile))
+        : dirname(configFile);
   let input: unknown = {};
 
   if (configFile !== undefined) {
@@ -65,4 +70,8 @@ export function loadConfig(options: LoadConfigOptions = {}): LoadedConfig {
     }
     throw error;
   }
+}
+
+function isCanonicalConfigPath(path: string): boolean {
+  return basename(path) === "config.yaml" && basename(dirname(path)) === ".skillbench";
 }

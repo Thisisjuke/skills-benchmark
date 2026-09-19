@@ -28,7 +28,7 @@ export function createCodexExecutionProfile(input: {
   ];
   if (missing.length > 0) {
     throw new SkillbenchError(
-      `Codex execution requires an explicit ${missing.join(" and ")} in skillbench.yaml`,
+      `Codex execution requires an explicit ${missing.join(" and ")} in .skillbench/config.yaml`,
       { code: "CODEX_PROFILE_REQUIRED" },
     );
   }

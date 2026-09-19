@@ -23,10 +23,13 @@ function discoverYamlFiles(inputPath: string): { rootPath: string; files: string
   try {
     stats = lstatSync(inputPath);
   } catch (error) {
-    throw new SkillbenchError(`Eval path not found: ${inputPath}`, {
-      code: "EVAL_PATH_NOT_FOUND",
-      cause: error,
-    });
+    throw new SkillbenchError(
+      `Eval path not found: ${inputPath}. Create it or provide the path to an existing YAML eval file or directory.`,
+      {
+        code: "EVAL_PATH_NOT_FOUND",
+        cause: error,
+      },
+    );
   }
   if (stats.isSymbolicLink()) {
     throw new SkillbenchError(`Eval path cannot be a symbolic link: ${inputPath}`, {
@@ -67,9 +70,10 @@ function discoverYamlFiles(inputPath: string): { rootPath: string; files: string
   };
   visit(inputPath);
   if (files.length === 0) {
-    throw new SkillbenchError(`No YAML eval files found in: ${inputPath}`, {
-      code: "EVAL_SUITE_EMPTY",
-    });
+    throw new SkillbenchError(
+      `No YAML eval files found in: ${inputPath}. Add at least one .yaml or .yml eval file.`,
+      { code: "EVAL_SUITE_EMPTY" },
+    );
   }
   return { rootPath: inputPath, files };
 }
@@ -125,7 +129,7 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
   const { rootPath, files } = discoverYamlFiles(inputPath);
   const directoryPartition = inferPartition(inputPath);
   const cases: EvalCase[] = [];
-  const ids = new Set<string>();
+  const ids = new Map<string, string>();
 
   for (const sourcePath of files) {
     const bytes = new Uint8Array(readFileSync(sourcePath));
@@ -134,16 +138,19 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
       document = evalCaseDocumentSchema.parse(parseYaml(new TextDecoder().decode(bytes)));
     } catch (error) {
       const details = error instanceof z.ZodError ? formatZodError(error) : toErrorMessage(error);
-      throw new SkillbenchError(`Invalid eval ${sourcePath}: ${details}`, {
-        code: "EVAL_VALIDATION_ERROR",
-        cause: error,
-      });
+      throw new SkillbenchError(
+        `Invalid eval ${sourcePath}: ${details}. Fix this YAML file so it defines an id, name, prompt, and at least one supported assertion.`,
+        {
+          code: "EVAL_VALIDATION_ERROR",
+          cause: error,
+        },
+      );
     }
 
     const partition = document.partition ?? options.partition ?? directoryPartition;
     if (partition === undefined) {
       throw new SkillbenchError(
-        `Eval partition is ambiguous for ${sourcePath}; set partition or use a development/holdout directory`,
+        `Eval partition is ambiguous for ${sourcePath}. Add "partition: development" or "partition: holdout", or move the file into a matching directory.`,
         { code: "EVAL_PARTITION_AMBIGUOUS" },
       );
     }
@@ -153,7 +160,7 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
       document.partition !== directoryPartition
     ) {
       throw new SkillbenchError(
-        `Eval partition ${document.partition} conflicts with directory partition ${directoryPartition}: ${sourcePath}`,
+        `Eval partition ${document.partition} conflicts with the ${directoryPartition} directory for ${sourcePath}. Change the file partition to ${directoryPartition} or move it into a ${document.partition} directory.`,
         { code: "EVAL_PARTITION_CONFLICT" },
       );
     }
@@ -163,7 +170,7 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
       document.partition !== options.partition
     ) {
       throw new SkillbenchError(
-        `Eval partition ${document.partition} does not match requested partition ${options.partition}: ${sourcePath}`,
+        `Eval partition ${document.partition} does not match requested partition ${options.partition} for ${sourcePath}. Change the file partition or request ${document.partition}.`,
         { code: "EVAL_PARTITION_CONFLICT" },
       );
     }
@@ -173,16 +180,17 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
       options.partition !== directoryPartition
     ) {
       throw new SkillbenchError(
-        `Requested partition ${options.partition} conflicts with directory partition ${directoryPartition}: ${sourcePath}`,
+        `Requested partition ${options.partition} conflicts with the ${directoryPartition} directory for ${sourcePath}. Request ${directoryPartition} or choose a matching suite directory.`,
         { code: "EVAL_PARTITION_CONFLICT" },
       );
     }
     if (ids.has(document.id)) {
-      throw new SkillbenchError(`Duplicate eval id in suite: ${document.id}`, {
-        code: "EVAL_ID_DUPLICATE",
-      });
+      throw new SkillbenchError(
+        `Duplicate eval id "${document.id}" in ${ids.get(document.id)} and ${sourcePath}. Give each eval file a unique id.`,
+        { code: "EVAL_ID_DUPLICATE" },
+      );
     }
-    ids.add(document.id);
+    ids.set(document.id, sourcePath);
 
     const fixtureFingerprints: string[] = [];
     const fixtures = document.fixtures.map((fixture) => {
@@ -226,9 +234,13 @@ export function loadEvalSuite(input: string, options: LoadEvalSuiteOptions = {})
 
   const partitions = new Set(cases.map((evalCase) => evalCase.partition));
   if (partitions.size !== 1) {
-    throw new SkillbenchError("An eval suite cannot mix development and holdout cases", {
-      code: "EVAL_PARTITION_MIXED",
-    });
+    const filesByPartition = cases
+      .map((evalCase) => `${evalCase.sourcePath} (${evalCase.partition})`)
+      .join(", ");
+    throw new SkillbenchError(
+      `Eval suite mixes development and holdout cases: ${filesByPartition}. Keep only one partition in each suite directory.`,
+      { code: "EVAL_PARTITION_MIXED" },
+    );
   }
   const partition = cases[0]!.partition;
   const identity = cases.map((evalCase) => [

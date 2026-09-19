@@ -49,26 +49,28 @@ then on, everything Skillbench owns remains anchored to that project root:
 
 | Location | Contents | Commit it? |
 | --- | --- | --- |
-| `skillbench.yaml` | Runner and evaluation configuration | Yes |
-| `evals/development/example.yaml` | Starter development evaluation to replace or extend | Yes |
-| `skillbench/assets.yaml` | Validated manifest for every model-facing project asset | Yes |
-| `skillbench/judge/SKILL.md` | Editable skill used for qualitative blind judging | Yes |
-| `skillbench/prompts/judge-instruction.txt` | Editable instruction sent to the judge | Yes |
-| `skillbench/templates/merge-candidate.md` | Editable merge-candidate template | Yes |
-| `.gitignore` | Receives one `.skillbench/` rule while preserving existing rules | Yes |
-| `.skillbench/` | CLI history, Promptfoo data, logs, caches, and temporary workspaces | No |
-| A path passed to `--output` | An explicit portable result bundle | Your choice |
+| `.skillbench/config.yaml` | Runner, evaluation, and run-output configuration | Yes |
+| `.skillbench/evals/development/example.yaml` | Starter scoring task and assertions to replace or extend | Yes |
+| `.skillbench/assets.yaml` | Validated manifest for every model-facing project asset | Yes |
+| `.skillbench/judge/SKILL.md` | Editable skill used for qualitative blind judging | Yes |
+| `.skillbench/prompts/judge-instruction.txt` | Editable instruction sent to the judge | Yes |
+| `.skillbench/templates/merge-candidate.md` | Editable merge-candidate template | Yes |
+| `.gitignore` | Receives targeted rules for generated Skillbench state | Yes |
+| `.skillbench/runs/` | Unique portable bundles from interactive operations | No |
+| `.skillbench/tmp/`, `.skillbench/promptfoo/`, CLI history, and Web state | Generated local state | No |
+| A path passed to `--output` | An exact portable bundle destination | Your choice |
 
-No result bundle or database is created implicitly. The CLI is database-free, and
-generated state stays under the ignored `.skillbench/` directory. Provider executables
-and their authentication remain external to the project, as expected.
+The CLI is database-free. Editable inputs and generated state share the `.skillbench/`
+namespace, but only the generated paths are ignored. Provider executables and their
+authentication remain external to the project, as expected.
 
 Missing parent directories are created automatically. Existing generated inputs are
 reported as conflicts; after review, `init --force` replaces only the known starter
 inputs and still preserves unrelated `.gitignore` rules.
 
-Interactive `init` asks for a runner and, for Codex or Claude, its model and reasoning
-effort. For a free deterministic workflow check, initialize with the mock runner:
+Interactive `init` asks for a runner, its provider-specific profile, and where runs
+should be saved; the default is `.skillbench/runs`. For a free deterministic workflow
+check, initialize with the mock runner:
 
 ```sh
 npx @thisisjuke/skillbench init --no-input
@@ -108,8 +110,9 @@ npx @thisisjuke/skillbench inspect \
   https://github.com/Thisisjuke/skills/tree/main/common/domain-modeling
 ```
 
-This resolves the GitHub ref, discovers the skill, and shows what would be evaluated.
-`inspect` is read-only, so you can also run it before `init`.
+This resolves the GitHub ref, discovers the skill, and writes a readable inspection
+bundle. In interactive mode, a missing project is initialized once before the run. For
+a transient inspection with no initialization or bundle, add `--no-input --no-output`.
 
 ### 2. Compare it with Matt Pocock's remote skill
 
@@ -121,8 +124,9 @@ npx @thisisjuke/skillbench compare \
 ```
 
 Skillbench downloads both sources into a temporary workspace below `.skillbench/`,
-uses the starter `evals/development` suite, and prints the comparison. `--repeat 1`
-keeps this first run small. Without `--output`, it writes no result bundle.
+uses the starter `.skillbench/evals/development` suite, prints the comparison, and
+saves a unique bundle below `.skillbench/runs/compare/`. `--repeat 1` keeps this first
+run small.
 
 ### 3. Merge the same two remote skills
 
@@ -134,8 +138,8 @@ npx @thisisjuke/skillbench merge \
 ```
 
 The merge pipeline compares the parents, plans and generates candidates, then selects
-the best result under the same development suite. Add an explicit output directory if
-you want to keep the complete portable bundle:
+the best result under the same development suite. The interactive run is saved
+automatically. Use an explicit output directory when a stable path is more convenient:
 
 ```sh
 npx @thisisjuke/skillbench merge \
@@ -169,6 +173,34 @@ contains several `SKILL.md` files, interactive mode offers a choice. In automati
 `--skill-path` for `inspect` or `eval`, and `--skill-path-a` / `--skill-path-b` for
 `compare` or `merge`. `--offline` rejects every remote source.
 
+## Define what a skill should accomplish
+
+An eval YAML file defines one scoring task: the prompt given to the runner and the
+assertions used to score its observable result. Keep development cases under
+`.skillbench/evals/development/`; the starter generated by `init` is a commented,
+loadable example.
+
+```yaml
+id: create-release-checklist
+name: Create a release checklist
+partition: development
+prompt: Create RELEASE_CHECKLIST.md with a Release checklist heading.
+assertions:
+  - type: exit-code
+    value: 0
+  - type: file-exists
+    value: RELEASE_CHECKLIST.md
+  - type: contains
+    path: RELEASE_CHECKLIST.md
+    value: "# Release checklist"
+```
+
+`--evals` accepts one YAML file or a directory of `.yaml` and `.yml` files. Every case
+loaded together must use the same `development` or `holdout` partition. Development
+cases guide comparison and candidate selection; reserve separate holdout cases for the
+final merge gate so they do not influence candidate creation. The preflight prints the
+resolved suite path, partition, case count, repetitions, and estimated model calls.
+
 ## Choose a runner and control cost
 
 The registered runners are `mock`, `codex`, and `claude`.
@@ -186,6 +218,11 @@ In interactive mode, the preflight shows resolved sources, fingerprints or commi
 suite, repetitions, runner profile, and estimated call count. `--yes` accepts that
 preflight in automation but never fills in a missing runner value.
 
+When `.skillbench/config.yaml` contains a complete runner profile, an interactive
+command first offers to reuse it and shows the runner, model, effort, and sandbox.
+Accepting skips the detailed profile questions. Declining selects a one-run override
+without rewriting the project configuration.
+
 ```sh
 npx @thisisjuke/skillbench \
   --runner codex \
@@ -197,24 +234,50 @@ npx @thisisjuke/skillbench \
   --repeat 1
 ```
 
-If a flag selects a different provider from `skillbench.yaml`, also provide that
+If a flag selects a different provider from `.skillbench/config.yaml`, also provide that
 provider's model and reasoning effort. Values are never reused across providers.
 
 ## Understand outputs
 
-By default, Skillbench prints a human-readable result and writes no bundle.
+Interactive `inspect`, `eval`, `compare`, and `merge` commands print a human-readable
+result and save a collision-free bundle under
+`<outputs.directory>/<command>/<timestamp-id>.skillbench`. The default configured
+directory is `.skillbench/runs`. Machine-oriented and non-interactive commands do not
+save implicitly; pass `--output` when automation needs a bundle.
 
 | Option | Output |
 | --- | --- |
 | `--json` | One versioned final result on stdout |
 | `--jsonl` | Versioned progress events used by integrations and the Web product |
 | `--debug` | Sanitized diagnostics and stack traces on stderr |
-| `--output <directory>` | A complete portable bundle written atomically |
+| `--output <directory>` | Write atomically to this exact directory instead of the automatic run path |
+| `--no-output` | Do not save the automatic bundle for an interactive operation |
 | `--force` | Replace the output only if it is already an identifiable Skillbench bundle |
 
 `--json` and `--jsonl` are mutually exclusive. Relative output paths are resolved from
-the project root. Saved bundles include the exact judge and merge assets used, with
-paths and SHA-256 hashes, so customized instructions remain auditable.
+the project root. An explicit non-empty destination fails unless `--force` identifies
+it as an existing Skillbench bundle. Automatic destinations are always unique, so the
+same command can be repeated without collisions.
+
+Every bundle starts with `report.md`, followed by the structured result and its
+integrity manifest:
+
+```text
+<run>.skillbench/
+├── report.md
+├── manifest.json
+├── result.json
+├── sources/
+├── reports/
+├── artifacts/
+└── instructions/
+```
+
+Open `report.md` first. `manifest.json` records paths, sizes, and SHA-256 hashes, while
+`result.json` preserves the machine-readable result. A merge bundle writes every
+generated skill below `artifacts/candidates/`, copies the development winner to
+`artifacts/recommended/`, and creates `artifacts/final/` only when a holdout gate
+accepts a candidate.
 
 ```sh
 npx @thisisjuke/skillbench inspect ./skill --json
@@ -247,7 +310,7 @@ Put global options before the command in scripts. Every command also exposes its
 
 | Global option | Purpose |
 | --- | --- |
-| `-c, --config <path>` | Use an explicit `skillbench.yaml` and therefore its directory as the project root |
+| `-c, --config <path>` | Use an explicit YAML config; `.skillbench/config.yaml` is the only automatically discovered path |
 | `--debug` | Add sanitized diagnostics to stderr |
 | `--offline` | Reject remote sources and network access |
 | `--runner <mock\|codex\|claude>` | Override `runner.type` |
@@ -262,19 +325,22 @@ Common command options:
 
 | Option | Commands | Purpose |
 | --- | --- | --- |
-| `--evals <path>` | `eval`, `compare`, `merge` | Read one suite or a directory; defaults to `evals/development` |
+| `--evals <path>` | `eval`, `compare`, `merge` | Read YAML scoring tasks and assertions; defaults to `.skillbench/evals/development` |
 | `--partition <development\|holdout>` | `eval`, `compare` | Require the loaded suite to match that partition |
 | `--repeat <1..100>` | `eval`, `compare`, `merge` | Override `eval.repeat`, whose built-in default is `3` |
 | `--keep-workspaces` | `eval`, `compare` | Retain execution directories below `.skillbench/tmp` |
 | `--holdout <path>` | `merge` | Add a holdout gate after development selection |
 | `--comparison <path>` | `merge` | Reuse a compatible comparison result or bundle |
-| `-o, --output <directory>` | Operations | Write a portable bundle relative to the project root |
+| `-o, --output <directory>` | Operations | Use this exact bundle path relative to the project root |
+| `--no-output` | Operations | Disable the automatic bundle in interactive mode |
 | `--force` | Operations | Replace an existing identifiable bundle; requires `--output` |
 | `--json` | Commands | Emit one versioned final result |
 
 Configuration-only controls—sandbox, timeouts, weights, judge behavior, merge
 thresholds, reports, and source size limits—are documented in
 [`skillbench.example.yaml`](skillbench.example.yaml).
+`reports.markdown` controls whether the comparison report is embedded in the structured
+comparison result; every saved bundle still has its root `report.md`.
 
 ## Integrate with another product
 
@@ -307,7 +373,7 @@ does not expose `init`, `history`, arbitrary flags, or arbitrary output paths.
 - **Status:** public npm product exposing the `skillbench` binary and documented
   contract subpaths.
 - **Owns:** terminal UX, automation entry, product composition, initialization, CLI
-  history, and explicit bundles.
+  history, and portable bundles.
 - **Does not own:** SQLite, Web lifecycle, provider implementations, or
   provider-independent domain rules.
 - **Depends on:** invocation contract, SDK, runner/source/assertion adapters, and test
@@ -323,8 +389,8 @@ src/composition/          adapter composition and runner registry
 src/cli/commands/         arguments and prompts mapped to application requests
 src/cli/renderers/        human-only terminal summaries
 src/cli/                  Commander, Clack, output modes, and error presentation
-src/bundles/              atomic writes for explicit outputs
-src/config/               skillbench.yaml loading and validation
+src/bundles/              atomic writes for automatic and explicit outputs
+src/config/               .skillbench/config.yaml loading and validation
 src/history/              bounded CLI MRU
 src/init/                 starter file generation
 src/assets/               project instruction manifest and asset loading
@@ -340,7 +406,7 @@ To add a runner, create its adapter and profile, then register one provider defi
 in the composition registry. To add a source, implement the SDK port in an adapter and
 connect it in composition. Model-facing prompts, rubrics, skills, and templates belong
 under `defaults/project`, are copied by `init`, and are referenced by
-`skillbench/assets.yaml`; `vp run instructions` guards that ownership.
+`.skillbench/assets.yaml`; `vp run instructions` guards that ownership.
 
 ### Dependency and artifact policy
 

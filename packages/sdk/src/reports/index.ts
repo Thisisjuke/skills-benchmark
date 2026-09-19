@@ -3,6 +3,12 @@ export {
   renderComparisonReport,
 } from "./comparison-renderer";
 export {
+  renderEvaluationBundleReport,
+  renderInspectBundleReport,
+  renderMergeBundleReport,
+  type InspectBundleReportInput,
+} from "./bundle-renderers";
+export {
   ComparisonReportService,
   type ReportRenderer,
   type ReportServiceOptions,

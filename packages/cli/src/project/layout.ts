@@ -1,11 +1,16 @@
 import { existsSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
 
-export const PROJECT_CONFIG_NAMES = ["skillbench.yaml", "skillbench.yml"] as const;
+export const PROJECT_CONFIG_RELATIVE_PATH = ".skillbench/config.yaml";
 
 export type ProjectLayout = {
   root: string;
   state: string;
+  config: string;
+  runs: string;
+  evals: {
+    development: string;
+  };
   temporary: string;
   promptfoo: {
     root: string;
@@ -18,10 +23,8 @@ export function findProjectConfig(startDirectory: string): string | undefined {
   let directory = resolve(startDirectory);
   const filesystemRoot = parse(directory).root;
   while (true) {
-    for (const name of PROJECT_CONFIG_NAMES) {
-      const candidate = join(directory, name);
-      if (existsSync(candidate)) return candidate;
-    }
+    const candidate = join(directory, ".skillbench", "config.yaml");
+    if (existsSync(candidate)) return candidate;
     if (directory === filesystemRoot) return undefined;
     directory = dirname(directory);
   }
@@ -34,6 +37,11 @@ export function createProjectLayout(projectRoot: string): ProjectLayout {
   return {
     root,
     state,
+    config: join(state, "config.yaml"),
+    runs: join(state, "runs"),
+    evals: {
+      development: join(state, "evals", "development"),
+    },
     temporary: join(state, "tmp"),
     promptfoo: {
       root: promptfoo,

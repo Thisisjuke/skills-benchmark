@@ -88,7 +88,7 @@ export class CapabilityExtractor {
       status: recommended ? "RECOMMENDED" : "MERGE_NOT_RECOMMENDED",
       reason: recommended
         ? "The development comparison identifies compatible or complementary evidence."
-        : "The scopes are disjoint; comparison remains valid but a universal merge is not recommended.",
+        : "No merged skill was generated because the sources address different task categories. Keep them separate, narrow them to a shared responsibility, or add development evals for a genuinely shared task.",
       comparisonId: evidence.comparisonId,
       comparisonRunId: evidence.comparisonRunId,
       parentAId: evidence.snapshotAId,

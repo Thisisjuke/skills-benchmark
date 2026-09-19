@@ -40,7 +40,10 @@ export type WriteBundleInput = {
   result: unknown;
   sources: readonly BundleSource[];
   reports?: readonly StoredReport[];
-  acceptedSkill?: MergeCandidate;
+  reportMarkdown: string;
+  candidates?: readonly MergeCandidate[];
+  recommendedSkill?: MergeCandidate;
+  finalSkill?: MergeCandidate;
   instructionAssets?: readonly ProjectAsset[];
   force?: boolean;
 };
@@ -48,6 +51,7 @@ export type WriteBundleInput = {
 export type WrittenBundle = {
   path: string;
   manifestPath: string;
+  reportPath: string;
 };
 
 export function writeBundle(input: WriteBundleInput): WrittenBundle {
@@ -60,15 +64,30 @@ export function writeBundle(input: WriteBundleInput): WrittenBundle {
   );
   mkdirSync(staging);
   try {
+    for (const directory of ["sources", "reports", "artifacts", "instructions"]) {
+      mkdirSync(join(staging, directory));
+    }
     const result = parseSkillbenchOperationResult(input.command, input.result);
     const envelope = createSkillbenchResultEnvelope(input.command, result);
     const resultBytes = new TextEncoder().encode(`${JSON.stringify(envelope, null, 2)}\n`);
     writeFile(staging, "result.json", resultBytes);
 
     const sources = input.sources.map((source) => writeSource(staging, source));
-    const reports = (input.reports ?? []).map((report) => writeReport(staging, report));
-    const artifacts =
-      input.acceptedSkill === undefined ? [] : writeAcceptedSkill(staging, input.acceptedSkill);
+    const reports = [
+      writePrimaryReport(staging, input.reportMarkdown),
+      ...(input.reports ?? []).map((report) => writeReport(staging, report)),
+    ];
+    const artifacts = [
+      ...(input.candidates ?? []).flatMap((candidate) =>
+        writeSkillArtifact(staging, `artifacts/candidates/${safeSegment(candidate.id)}`, candidate),
+      ),
+      ...(input.recommendedSkill === undefined
+        ? []
+        : writeSkillArtifact(staging, "artifacts/recommended", input.recommendedSkill)),
+      ...(input.finalSkill === undefined
+        ? []
+        : writeSkillArtifact(staging, "artifacts/final", input.finalSkill)),
+    ];
     const instructions = (input.instructionAssets ?? []).map((asset) =>
       writeInstruction(staging, asset),
     );
@@ -89,7 +108,11 @@ export function writeBundle(input: WriteBundleInput): WrittenBundle {
 
     if (existsSync(destination)) rmSync(destination, { recursive: true });
     renameSync(staging, destination);
-    return { path: destination, manifestPath: join(destination, "manifest.json") };
+    return {
+      path: destination,
+      manifestPath: join(destination, "manifest.json"),
+      reportPath: join(destination, "report.md"),
+    };
   } catch (error) {
     rmSync(staging, { recursive: true, force: true });
     throw error;
@@ -128,9 +151,20 @@ function writeReport(staging: string, report: StoredReport): BundleReportReferen
   return { ...fileReference(path, bytes), id: report.id, mediaType: "text/markdown" };
 }
 
-function writeAcceptedSkill(staging: string, candidate: MergeCandidate): BundleArtifactReference[] {
+function writePrimaryReport(staging: string, markdown: string): BundleReportReference {
+  const path = "report.md";
+  const bytes = new TextEncoder().encode(markdown);
+  writeFile(staging, path, bytes);
+  return { ...fileReference(path, bytes), id: "summary", mediaType: "text/markdown" };
+}
+
+function writeSkillArtifact(
+  staging: string,
+  directory: string,
+  candidate: MergeCandidate,
+): BundleArtifactReference[] {
   return candidate.files.map((file) => {
-    const path = `artifacts/final/${file.relativePath}`;
+    const path = `${directory}/${file.relativePath}`;
     writeFile(staging, path, file.content);
     return { ...fileReference(path, file.content), kind: "skill" };
   });

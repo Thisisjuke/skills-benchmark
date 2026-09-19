@@ -1,5 +1,3 @@
-import { join } from "node:path";
-
 import type { CompareOperationResult } from "../../application/compare";
 import { executionProfileLabel } from "../runner-label";
 
@@ -21,10 +19,10 @@ export function renderCompareResult(input: {
     `Score B: ${(result.verdict.scoreB * 100).toFixed(1)}%`,
     `Winner: ${result.verdict.winner}`,
     ...(bundle === undefined
-      ? ["Artifacts: not written. Save next time with: --output ./results/comparison.skillbench"]
+      ? []
       : [
+          `Report: ${bundle.reportPath}`,
           `Bundle: ${bundle.path}`,
-          ...(result.report === undefined ? [] : [`Reports: ${join(bundle.path, "reports")}`]),
         ]),
   ].join("\n")}\n`;
 }

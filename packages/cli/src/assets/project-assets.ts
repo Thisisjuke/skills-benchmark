@@ -44,7 +44,7 @@ export type ProjectRuntimeAssets = {
 
 export function loadProjectRuntimeAssets(projectRoot: string): ProjectRuntimeAssets {
   const root = resolve(projectRoot);
-  const assetsRoot = resolve(root, "skillbench");
+  const assetsRoot = resolve(root, ".skillbench");
   const manifestPath = resolve(assetsRoot, "assets.yaml");
   let document: unknown;
   try {
@@ -101,7 +101,7 @@ function loadAsset(
 ): ProjectAsset {
   const absolutePath = resolve(assetsRoot, ...configuredPath.split("/"));
   if (!inside(assetsRoot, absolutePath)) {
-    throw assetError(`Instruction asset escapes skillbench/: ${configuredPath}`);
+    throw assetError(`Instruction asset escapes .skillbench/: ${configuredPath}`);
   }
   let content: Uint8Array;
   try {

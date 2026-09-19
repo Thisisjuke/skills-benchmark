@@ -1,5 +1,5 @@
 // Registered by the CLI project lifecycle scenario suite.
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -26,6 +26,7 @@ describe("writeBundle", () => {
       cwd,
       result,
       sources: [{ role: "skill", skill }],
+      reportMarkdown: "# Inspection\n",
     });
 
     const manifest = skillbenchBundleManifestSchema.parse(
@@ -39,6 +40,13 @@ describe("writeBundle", () => {
     expect(readFileSync(join(written.path, "sources", "skill", "SKILL.md"), "utf8")).toContain(
       "basic-skill",
     );
+    expect(readFileSync(written.reportPath, "utf8")).toBe("# Inspection\n");
+    expect(manifest.reports).toEqual([
+      expect.objectContaining({ id: "summary", path: "report.md" }),
+    ]);
+    for (const directory of ["sources", "reports", "artifacts", "instructions"]) {
+      expect(statSync(join(written.path, directory)).isDirectory(), directory).toBe(true);
+    }
   });
 
   it("refuses non-empty destinations and unsafe forced replacement", async () => {
@@ -56,6 +64,7 @@ describe("writeBundle", () => {
       cwd,
       result: {},
       sources: [{ role: "skill" as const, skill }],
+      reportMarkdown: "# Inspection\n",
     };
 
     expect(() => writeBundle(input)).toThrow(/not empty/u);

@@ -7,3 +7,5 @@ merge:
   candidates: 3
   requireImprovement: true
   minimumImprovement: 0
+outputs:
+  directory: .skillbench/runs

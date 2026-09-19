@@ -19,9 +19,7 @@ export function renderInspectResult(input: {
           `Resolved commit: ${result.repository.resolvedCommit.slice(0, 12)}`,
         ]),
     `Files: ${result.files.length}`,
-    ...(bundle === undefined
-      ? ["Artifacts: not written. Save next time with: --output ./results/inspection.skillbench"]
-      : [`Bundle: ${bundle.path}`]),
+    ...(bundle === undefined ? [] : [`Report: ${bundle.reportPath}`, `Bundle: ${bundle.path}`]),
   ].join("\n")}\n`;
 }
 

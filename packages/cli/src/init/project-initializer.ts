@@ -5,46 +5,64 @@ import { fileURLToPath } from "node:url";
 import { SkillbenchError } from "@skillbench/sdk/errors";
 
 import type { RunnerChoice } from "../composition/runner-registry";
+import { DEFAULT_RUNS_DIRECTORY } from "../config";
+import { findProjectConfig } from "../project";
 
-const STATE_IGNORE_RULE = ".skillbench/";
+const GENERATED_IGNORE_RULES = [
+  ".skillbench/runs/",
+  ".skillbench/tmp/",
+  ".skillbench/promptfoo/",
+  ".skillbench/cli-history.json",
+  ".skillbench/web/",
+  ".skillbench/skillbench-web.sqlite",
+] as const;
 
 export const INITIALIZED_PROJECT_FILES = Object.freeze([
   {
-    path: "skillbench.yaml",
-    description: "Project runner, evaluation, and Promptfoo settings.",
+    path: ".skillbench/config.yaml",
+    description: "Project runner, evaluation, and output settings.",
   },
   {
-    path: "evals/development/example.yaml",
+    path: ".skillbench/evals/development/example.yaml",
     description: "A starter development evaluation to replace or extend.",
   },
   {
-    path: "skillbench/assets.yaml",
+    path: ".skillbench/assets.yaml",
     description: "The validated map of editable runtime instruction assets.",
   },
   {
-    path: "skillbench/judge/SKILL.md",
+    path: ".skillbench/judge/SKILL.md",
     description: "The local skill used for qualitative blind judging.",
   },
   {
-    path: "skillbench/prompts/judge-instruction.txt",
+    path: ".skillbench/prompts/judge-instruction.txt",
     description: "The instruction sent to the qualitative judge runner.",
   },
   {
-    path: "skillbench/templates/merge-candidate.md",
+    path: ".skillbench/templates/merge-candidate.md",
     description: "The template used to render generated merge candidates.",
   },
   {
     path: ".gitignore",
-    description: "Preserves existing rules and ignores generated .skillbench state.",
+    description: "Preserves existing rules and ignores generated Skillbench state.",
   },
 ] as const);
 
 const PROJECT_TEMPLATES = [
-  "evals/development/example.yaml",
-  "skillbench/assets.yaml",
-  "skillbench/judge/SKILL.md",
-  "skillbench/prompts/judge-instruction.txt",
-  "skillbench/templates/merge-candidate.md",
+  {
+    target: ".skillbench/evals/development/example.yaml",
+    source: "evals/development/example.yaml",
+  },
+  { target: ".skillbench/assets.yaml", source: "skillbench/assets.yaml" },
+  { target: ".skillbench/judge/SKILL.md", source: "skillbench/judge/SKILL.md" },
+  {
+    target: ".skillbench/prompts/judge-instruction.txt",
+    source: "skillbench/prompts/judge-instruction.txt",
+  },
+  {
+    target: ".skillbench/templates/merge-candidate.md",
+    source: "skillbench/templates/merge-candidate.md",
+  },
 ] as const;
 
 export type InitResult = {
@@ -53,20 +71,22 @@ export type InitResult = {
   unchanged: string[];
   runner: RunnerChoice["runner"];
   profile: RunnerChoice;
+  outputsDirectory: string;
 };
 
 export type InitializeProjectOptions = {
   force?: boolean;
   profile?: RunnerChoice;
+  outputsDirectory?: string;
 };
 
 export function shouldRecommendInitialization(cwd: string): boolean {
-  return !existsSync(join(cwd, "skillbench.yaml")) && !existsSync(join(cwd, "skillbench.yml"));
+  return findProjectConfig(cwd) === undefined;
 }
 
 export function initializedProjectConflicts(cwd: string): string[] {
   const root = resolve(cwd);
-  return ["skillbench.yaml", "skillbench.yml", ...PROJECT_TEMPLATES]
+  return [".skillbench/config.yaml", ...PROJECT_TEMPLATES.map(({ target }) => target)]
     .map((path) => join(root, ...path.split("/")))
     .filter((path) => existsSync(path));
 }
@@ -76,19 +96,16 @@ export function initializeProject(
   options: InitializeProjectOptions = {},
 ): InitResult {
   const root = resolve(cwd);
-  const alternateConfig = join(root, "skillbench.yml");
-  if (existsSync(alternateConfig)) {
-    throw new SkillbenchError(
-      `A project configuration already exists at ${alternateConfig}; move or remove it before initialization.`,
-      { code: "CLI_INIT_EXISTS" },
-    );
-  }
   const profile = options.profile ?? { runner: "mock" };
+  const outputsDirectory = options.outputsDirectory ?? DEFAULT_RUNS_DIRECTORY;
   const files = [
-    { path: join(root, "skillbench.yaml"), content: renderConfig(profile) },
-    ...PROJECT_TEMPLATES.map((path) => ({
-      path: join(root, ...path.split("/")),
-      content: readDefault(join("project", ...path.split("/"))),
+    {
+      path: join(root, ".skillbench", "config.yaml"),
+      content: renderConfig(profile, outputsDirectory),
+    },
+    ...PROJECT_TEMPLATES.map(({ target, source }) => ({
+      path: join(root, ...target.split("/")),
+      content: readDefault(join("project", ...source.split("/"))),
     })),
   ];
   const existing = files.filter((file) => existsSync(file.path));
@@ -116,13 +133,14 @@ export function initializeProject(
     unchanged: gitignore.status === "unchanged" ? [gitignore.path] : [],
     runner: profile.runner,
     profile,
+    outputsDirectory,
   };
 }
 
-function renderConfig(profile: RunnerChoice): string {
+function renderConfig(profile: RunnerChoice, outputsDirectory: string): string {
   const template = readDefault(join("config", `${profile.runner}.yaml`));
-  if (profile.runner === "mock") return template;
   return template
+    .replace("{{outputsDirectory}}", JSON.stringify(outputsDirectory))
     .replace("{{model}}", JSON.stringify(profile.model))
     .replace("{{reasoningEffort}}", JSON.stringify(profile.reasoningEffort));
 }
@@ -148,15 +166,14 @@ function updateGitignore(root: string): {
 } {
   const path = join(root, ".gitignore");
   if (!existsSync(path)) {
-    writeFileSync(path, `${STATE_IGNORE_RULE}\n`, "utf8");
+    writeFileSync(path, `${GENERATED_IGNORE_RULES.join("\n")}\n`, "utf8");
     return { path, status: "created" };
   }
   const current = readFileSync(path, "utf8");
   const rules = current.split(/\r?\n/u).map((line) => line.trim());
-  if (rules.includes(STATE_IGNORE_RULE) || rules.includes(".skillbench")) {
-    return { path, status: "unchanged" };
-  }
+  const missing = GENERATED_IGNORE_RULES.filter((rule) => !rules.includes(rule));
+  if (missing.length === 0) return { path, status: "unchanged" };
   const separator = current === "" || current.endsWith("\n") ? "" : "\n";
-  writeFileSync(path, `${current}${separator}${STATE_IGNORE_RULE}\n`, "utf8");
+  writeFileSync(path, `${current}${separator}${missing.join("\n")}\n`, "utf8");
   return { path, status: "updated" };
 }

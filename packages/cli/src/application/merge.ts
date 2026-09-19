@@ -48,7 +48,8 @@ export async function executeMerge(
   context: ApplicationContext,
   request: MergeRequest,
 ): Promise<MergeOperationResult> {
-  const suite = loadEvalSuite(projectPath(request.projectRoot, request.evals), {
+  const evalsPath = projectPath(request.projectRoot, request.evals);
+  const suite = loadEvalSuite(evalsPath, {
     partition: "development",
   });
   if (suite.partition !== "development") {
@@ -102,7 +103,7 @@ export async function executeMerge(
       operation: "merge",
       skills: [skillA, skillB],
       suite,
-      suiteInput: request.evals,
+      suiteInput: evalsPath,
       repeat,
       executionProfile: runtime.executionProfile,
       instructionAssets: [

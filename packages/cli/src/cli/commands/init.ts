@@ -7,7 +7,7 @@ import { renderInitialization } from "../renderers";
 export function registerInitCommand(program: Command, context: ExecutionCommandContext): void {
   program
     .command("init")
-    .description("create a portable Skillbench project in the current directory")
+    .description("create .skillbench config, evals and runtime assets in the current directory")
     .option("--force", "replace only the generated starter files")
     .option("--json", "write structured JSON")
     .action(async (options: { force?: boolean; json?: boolean }, command: Command) => {

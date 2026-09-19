@@ -4,3 +4,4 @@ import "./history.scenario";
 import "./init.scenario";
 import "./project-assets.scenario";
 import "./project-layout.scenario";
+import "./run-output.scenario";

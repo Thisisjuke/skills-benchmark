@@ -100,7 +100,7 @@ function judgeSnapshot(assets: ProjectRuntimeAssets): SkillSnapshot {
   return {
     id: `project-judge-${assets.judgeSkill.contentHash}`,
     origin: { type: "local", originalInput: assets.judgeSkill.path },
-    rootPath: "skillbench/judge",
+    rootPath: ".skillbench/judge",
     files: [file],
     fingerprint: fingerprintFiles([file]),
     fingerprintAlgorithm: FINGERPRINT_ALGORITHM,

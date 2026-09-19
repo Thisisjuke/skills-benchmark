@@ -12,7 +12,7 @@ jobs:
     name: Validate and publish both products
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Checkout
@@ -114,3 +114,21 @@ jobs:
       - name: Publish Web
         if: steps.registry.outputs.web == 'true'
         run: npx --yes npm@12.0.2 publish "./${{ steps.artifacts.outputs.web }}" --access public --provenance=false --loglevel verbose
+
+      - name: Create or update GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes_path=".github/releases/$GITHUB_REF_NAME.md"
+          test -s "$notes_path"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "Skillbench $GITHUB_REF_NAME" \
+              --notes-file "$notes_path"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --title "Skillbench $GITHUB_REF_NAME" \
+              --notes-file "$notes_path"
+          fi

@@ -12,7 +12,9 @@ export function renderPreflight(input: PreflightInput): string[] {
         ? []
         : [`  Commit: ${shortIdentifier(skill.snapshot.repository.resolvedCommit)}`]),
     ]),
-    `Eval suite: ${input.suiteInput} (${input.suite.partition}, ${caseCount(input.suite.cases.length)})`,
+    `Eval suite: ${input.suiteInput}`,
+    `  Partition: ${input.suite.partition}`,
+    `  Cases: ${input.suite.cases.length}`,
     `  ID: ${shortIdentifier(input.suite.id)}`,
     `Repeats: ${input.repeat}`,
     `Runner: ${formatExecutionSelection(input.executionProfile)}`,
@@ -29,8 +31,4 @@ export function renderPreflight(input: PreflightInput): string[] {
 
 function shortIdentifier(value: string): string {
   return value.slice(0, 12);
-}
-
-function caseCount(count: number): string {
-  return `${count} ${count === 1 ? "case" : "cases"}`;
 }

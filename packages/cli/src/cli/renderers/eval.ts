@@ -17,8 +17,6 @@ export function renderEvalResult(input: {
     `Pass rate: ${(result.passRate * 100).toFixed(1)}%`,
     `Mean score: ${(result.meanScore * 100).toFixed(1)}%`,
     ...(result.workspaceRoot === undefined ? [] : [`Workspaces: ${result.workspaceRoot}`]),
-    ...(bundle === undefined
-      ? ["Artifacts: not written. Save next time with: --output ./results/evaluation.skillbench"]
-      : [`Bundle: ${bundle.path}`]),
+    ...(bundle === undefined ? [] : [`Report: ${bundle.reportPath}`, `Bundle: ${bundle.path}`]),
   ].join("\n")}\n`;
 }

@@ -35,6 +35,7 @@ export type CompareRequest = OutputRequest & {
   repeat?: number;
   keepWorkspaces?: boolean;
   recordHistory?: boolean;
+  historyOutput?: string;
   events: OperationEvents;
 };
 
@@ -47,8 +48,9 @@ export async function executeCompare(
   context: ApplicationContext,
   request: CompareRequest,
 ): Promise<CompareOperationResult> {
+  const evalsPath = projectPath(request.projectRoot, request.evals);
   const suite = loadEvalSuite(
-    projectPath(request.projectRoot, request.evals),
+    evalsPath,
     request.partition === undefined ? {} : { partition: request.partition },
   );
   const sources = context.sourceService(request.config, request.projectRoot);
@@ -90,7 +92,7 @@ export async function executeCompare(
       operation: "compare",
       skills: [skillA, skillB],
       suite,
-      suiteInput: request.evals,
+      suiteInput: evalsPath,
       repeat,
       executionProfile: runtime.executionProfile,
       instructionAssets: instructionAssets.map(({ id, path, contentHash, sizeBytes }) => ({
@@ -130,6 +132,14 @@ export async function executeCompare(
         skillB,
       )
     : undefined;
+  const bundleReport =
+    request.output === undefined || report !== undefined
+      ? report
+      : new ComparisonReportService({ id: context.createId, now: context.now }).create(
+          summary,
+          skillA,
+          skillB,
+        );
   const result: CompareResult = {
     ...summary,
     instructionAssets: instructionAssets.map(({ id, path, contentHash, sizeBytes }) => ({
@@ -157,7 +167,7 @@ export async function executeCompare(
             { role: "B", skill: skillB },
           ],
           instructionAssets,
-          ...(report === undefined ? {} : { reports: [report] }),
+          reportMarkdown: (bundleReport ?? report)?.markdown ?? "# Skill comparison\n",
           force: request.force === true,
         });
   if (request.recordHistory === true) {
@@ -172,7 +182,7 @@ export async function executeCompare(
         ? {}
         : { skillPathB: request.resolveOptionsB.skillPath }),
       evals: request.evals,
-      ...(request.output === undefined ? {} : { output: request.output }),
+      ...(request.historyOutput === undefined ? {} : { output: request.historyOutput }),
       partition: suite.partition,
       repeat,
       runner: runnerChoice.runner,

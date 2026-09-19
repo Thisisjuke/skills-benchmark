@@ -16,7 +16,7 @@ Skillbench gives that work a repeatable loop:
 2. run both skills against the same versioned evaluation suite;
 3. compare results with an explicit runner, model, and judging configuration;
 4. generate merge candidates and optionally validate the winner on a holdout suite;
-5. keep the inputs and, when requested, a portable result bundle for review.
+5. keep each interactive run as a portable, human-readable result bundle for review.
 
 You can use the free deterministic mock runner to exercise the workflow, or connect an
 installed Codex or Claude executable for meaningful model-backed evaluations. The
@@ -43,13 +43,15 @@ are architectural boundaries, not packages users install separately.
 
 Requirements: Node.js 22.22.2 or newer. Remote examples also require network access.
 
-### Inspect a remote skill—no project setup
+### Inspect a remote skill transiently—no project setup
 
-`inspect` does not run a model and does not require initialization:
+`inspect` does not run a model. Disable prompts for a one-off run that neither
+initializes a project nor saves a bundle:
 
 ```sh
 npx @thisisjuke/skillbench inspect \
-  https://github.com/Thisisjuke/skills/tree/main/common/domain-modeling
+  https://github.com/Thisisjuke/skills/tree/main/common/domain-modeling \
+  --no-input --no-output
 ```
 
 ### Compare two remote skills in a disposable playground
@@ -72,9 +74,11 @@ than a meaningful quality ranking. For real evaluations, run interactive `init` 
 choose an installed, authenticated Codex or Claude runner.
 
 The current directory becomes the Skillbench project. Versionable configuration,
-evaluation suites, and model-facing instructions stay in that directory; generated
-state stays under its ignored `.skillbench/` directory. Skillbench writes a result
-bundle only when you pass `--output`.
+evaluation suites, and model-facing instructions live under `.skillbench/`; only
+generated subdirectories such as runs, temporary workspaces, caches, and Web state are
+ignored. Interactive commands save unique bundles below `.skillbench/runs/` by default.
+Use `--no-output` to opt out, or `--output <directory>` to choose an exact destination.
+Automation remains explicit and does not create a bundle unless it passes `--output`.
 
 Continue with the [CLI journey](packages/cli/README.md#try-the-remote-skill-journey) to
 inspect, compare, and merge the same two remote skills.

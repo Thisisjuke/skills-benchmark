@@ -1,6 +1,6 @@
 {
   "name": "@thisisjuke/skillbench",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local-first benchmark CLI for Agent Skills",
   "homepage": "https://github.com/Thisisjuke/skills-benchmark/tree/main/packages/cli#readme",
   "bugs": {
