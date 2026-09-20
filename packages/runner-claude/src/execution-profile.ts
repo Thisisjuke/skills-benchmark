@@ -25,12 +25,12 @@ export function createClaudeExecutionProfile(input: {
   effort?: ClaudeEffort;
 }): ClaudeExecutionProfile {
   const missing = [
-    ...(input.model === undefined ? ["runner.model"] : []),
-    ...(input.effort === undefined ? ["runner.reasoningEffort"] : []),
+    ...(input.model === undefined ? ["model"] : []),
+    ...(input.effort === undefined ? ["reasoningEffort"] : []),
   ];
   if (missing.length > 0) {
     throw new SkillbenchError(
-      `Claude execution requires an explicit ${missing.join(" and ")} in .skillbench/config.yaml`,
+      `Claude execution requires an explicit ${missing.join(" and ")} in its configured runner profile`,
       { code: "CLAUDE_PROFILE_REQUIRED" },
     );
   }

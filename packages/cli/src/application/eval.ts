@@ -13,15 +13,14 @@ import { isAbsolute, resolve } from "node:path";
 import type { ApplicationContext, OperationEvents, OutputRequest } from "./context";
 import { resolveApplicationSource } from "./source";
 import type { WrittenBundle } from "../bundles";
-import type { RunnerChoice } from "../composition/runner-registry";
-import type { SkillbenchConfig } from "../config";
+import type { RunnerSelection, SkillbenchConfig } from "../config";
 import { effectiveRunConfig } from "./effective-config";
 import { evaluationRunCount, runnerWithProgress } from "./progress";
 
 export type EvalRequest = OutputRequest & {
   config: SkillbenchConfig;
   projectRoot: string;
-  selectRunner: () => Promise<RunnerChoice>;
+  selectRunner: () => Promise<RunnerSelection>;
   source: string;
   resolveOptions: ResolveOptions;
   evals: string;
@@ -53,10 +52,10 @@ export async function executeEval(
       context.now(),
     ),
   );
-  const runnerChoice = await request.selectRunner();
+  const runnerSelection = await request.selectRunner();
   const runtime = await context.executionRuntime(
     request.config,
-    runnerChoice,
+    runnerSelection,
     request.projectRoot,
   );
   const repeat = request.repeat ?? request.config.eval.repeat;
@@ -95,8 +94,13 @@ export async function executeEval(
       repeat,
       timeoutMs: request.config.eval.timeoutMs,
       executionProfile: runtime.executionProfile,
-      config: effectiveRunConfig(request.config, repeat, runtime.executionProfile),
-      permissions: createRunnerPermissions(request.config.runner.sandbox),
+      config: effectiveRunConfig(
+        request.config,
+        repeat,
+        runtime.executionProfile,
+        runtime.configuration,
+      ),
+      permissions: createRunnerPermissions(runtime.configuration.sandbox),
       keepWorkspaces: request.keepWorkspaces === true,
       ...(context.signal === undefined ? {} : { signal: context.signal }),
     }),

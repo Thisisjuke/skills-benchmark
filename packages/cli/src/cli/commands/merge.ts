@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 
 import { executeMerge } from "../../application";
+import { addConfiguredRunner } from "../../config";
 import type { ExecutionCommandContext } from "../command-context";
 import {
   getGlobalOptions,
@@ -52,14 +53,22 @@ export function registerMergeCommand(program: Command, context: ExecutionCommand
       ) => {
         validateOutputOptions(options);
         const session = context.sessionFor(command, options.json === true);
-        const { config, layout, initializationChoice } = await ensureInitializedProject(
+        const { config, configFile, layout, initializationChoice } = await ensureInitializedProject(
           context,
           command,
           options.json === true,
         );
         const runnerChoice =
           initializationChoice ??
-          (await session.runnerChoice(config, getGlobalOptions(command)));
+          (await session.runnerChoice(
+            config,
+            getGlobalOptions(command),
+            configFile === undefined
+              ? {}
+              : {
+                  onRunnerAdded: (runner) => addConfiguredRunner(configFile, runner),
+                },
+          ));
         const sourceA = await session.requiredText(
           inputA,
           "skill-a",

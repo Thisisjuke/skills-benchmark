@@ -47,6 +47,8 @@ type ClaudeResult = {
 
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
 const DEFAULT_VERSION_TIMEOUT_MS = 5_000;
+const MINIMUM_VERSION = [2, 1, 259] as const;
+export const CLAUDE_VERSION_RANGE = ">=2.1.259 <3.0.0";
 const READ_ONLY_TOOLS = "Read,Glob,Grep,Skill";
 const WORKSPACE_WRITE_TOOLS = "Read,Glob,Grep,Skill,Edit,Write,Bash";
 const ENVIRONMENT_ALLOWLIST = [
@@ -167,8 +169,9 @@ export class ClaudeRunner implements Runner {
       "json",
       "--no-session-persistence",
       "--no-chrome",
-      "--setting-sources",
-      "project",
+      "--restricted",
+      "--permission-prompts",
+      "none",
       "--strict-mcp-config",
       "--mcp-config",
       '{"mcpServers":{}}',
@@ -266,14 +269,11 @@ export class ClaudeRunner implements Runner {
         { code: "CLAUDE_UNAVAILABLE" },
       );
     }
-    if (
-      !/^(?:claude-code\s+)?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?(?:\s+\(Claude Code\))?$/u.test(
-        version,
-      )
-    ) {
-      throw new SkillbenchError(`Unsupported Claude version response: ${version || "<empty>"}`, {
-        code: "CLAUDE_VERSION_UNSUPPORTED",
-      });
+    if (!isSupportedClaudeVersion(version)) {
+      throw new SkillbenchError(
+        `Unsupported Claude version: ${version || "<empty>"} (requires ${CLAUDE_VERSION_RANGE})`,
+        { code: "CLAUDE_VERSION_UNSUPPORTED" },
+      );
     }
     this.logger.debug("claude.version.complete", { executable: this.executable, version });
     return version;
@@ -295,6 +295,28 @@ export class ClaudeRunner implements Runner {
       });
     }
   }
+}
+
+export function isSupportedClaudeVersion(version: string): boolean {
+  const match = /^(?:claude-code\s+)?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?(?:\s+\(Claude Code\))?$/u.exec(
+    version.trim(),
+  );
+  return match !== null && supportedVersion(match.slice(1, 4).map(Number));
+}
+
+function supportedVersion(version: number[]): boolean {
+  if (version.length !== 3 || version.some((part) => !Number.isSafeInteger(part) || part < 0)) {
+    return false;
+  }
+  if (version[0] !== MINIMUM_VERSION[0]) return false;
+  for (let index = 1; index < MINIMUM_VERSION.length; index += 1) {
+    const part = version[index] ?? -1;
+    const minimum = MINIMUM_VERSION[index];
+    if (minimum === undefined) return false;
+    if (part > minimum) return true;
+    if (part < minimum) return false;
+  }
+  return true;
 }
 
 function parseResult(stdout: string): { result?: ClaudeResult; invalid: boolean } {

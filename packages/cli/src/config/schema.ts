@@ -11,12 +11,13 @@ import {
 
 export { runnerEffortSchema, runnerTypeSchema, type RunnerEffort, type RunnerType };
 
-const runnerSchema = z
+export const configuredRunnerSchema = z
   .object({
     type: runnerTypeSchema.default("codex"),
     executable: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
     reasoningEffort: runnerEffortSchema.optional(),
+    variant: z.string().trim().min(1).optional(),
     sandbox: runnerSandboxSchema.default("workspace-write"),
     maxOutputBytes: z
       .number()
@@ -27,6 +28,20 @@ const runnerSchema = z
   .strict()
   .superRefine((runner, context) => {
     const definition = runnerDefinition(runner.type);
+    if (definition.requiresModel && runner.model === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["model"],
+        message: `${definition.name} requires a model`,
+      });
+    }
+    if (definition.efforts.length > 0 && runner.reasoningEffort === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["reasoningEffort"],
+        message: `${definition.name} requires a reasoning effort`,
+      });
+    }
     if (runner.reasoningEffort !== undefined && !definition.acceptsEffort(runner.reasoningEffort)) {
       context.addIssue({
         code: "custom",
@@ -37,11 +52,46 @@ const runnerSchema = z
             : `${definition.name} effort must be ${definition.efforts.join(", ")}`,
       });
     }
+    if (runner.variant !== undefined && !definition.acceptsVariant) {
+      context.addIssue({
+        code: "custom",
+        path: ["variant"],
+        message: `${definition.label} does not accept a variant`,
+      });
+    }
   })
   .transform((runner) => ({
     ...runner,
     executable: runner.executable ?? runnerDefinition(runner.type).defaultExecutable,
   }));
+
+export type ConfiguredRunner = z.infer<typeof configuredRunnerSchema>;
+
+const configuredRunnersSchema = z
+  .array(configuredRunnerSchema)
+  .min(1, "at least one configured runner is required")
+  .superRefine((runners, context) => {
+    const seen = new Set<string>();
+    for (const [index, runner] of runners.entries()) {
+      const key = JSON.stringify(runner);
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: [index],
+          message: "configured runners must be unique",
+        });
+      }
+      seen.add(key);
+    }
+  })
+  .default([
+    {
+      type: "mock",
+      executable: "mock",
+      sandbox: "workspace-write",
+      maxOutputBytes: 1024 * 1024,
+    },
+  ]);
 
 const evalSchema = z
   .object({
@@ -159,12 +209,7 @@ const sourcesSchema = z
 
 export const skillbenchConfigSchema = z
   .object({
-    runner: runnerSchema.default({
-      type: "codex",
-      executable: "codex",
-      sandbox: "workspace-write",
-      maxOutputBytes: 1024 * 1024,
-    }),
+    runners: configuredRunnersSchema,
     eval: evalSchema.default({
       path: ".skillbench/evals/development/default.yaml",
       repeat: 3,

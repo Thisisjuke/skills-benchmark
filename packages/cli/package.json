@@ -1,6 +1,6 @@
 {
   "name": "@thisisjuke/skillbench",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local-first benchmark CLI for Agent Skills",
   "homepage": "https://github.com/Thisisjuke/skills-benchmark/tree/main/packages/cli#readme",
   "bugs": {
@@ -54,6 +54,7 @@
     "@skillbench/invocation-contract": "workspace:*",
     "@skillbench/runner-claude": "workspace:*",
     "@skillbench/runner-codex": "workspace:*",
+    "@skillbench/runner-opencode": "workspace:*",
     "@skillbench/sdk": "workspace:*",
     "@skillbench/source-github": "workspace:*",
     "@skillbench/test-contracts": "workspace:*",

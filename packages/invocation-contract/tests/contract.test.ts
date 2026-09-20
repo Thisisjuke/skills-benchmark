@@ -54,7 +54,7 @@ describe("Skillbench invocation contract", () => {
     for (const event of events) expect(skillbenchEventSchema.parse(event)).toEqual(event);
   });
 
-  it("requires a deterministic runner profile for model operations", () => {
+  it("requires a valid runner profile for model operations", () => {
     expect(
       skillbenchAutomationRequestSchema.parse({
         command: "compare",
@@ -64,6 +64,26 @@ describe("Skillbench invocation contract", () => {
         profile: { runner: "claude", model: "claude-sonnet-4-6", reasoningEffort: "max" },
       }),
     ).toMatchObject({ profile: { runner: "claude" } });
+    expect(
+      skillbenchAutomationRequestSchema.parse({
+        command: "eval",
+        source: "./skill",
+        evals: "evals/development",
+        profile: {
+          runner: "opencode",
+          model: "anthropic/claude-sonnet-4-6",
+          variant: "high",
+        },
+      }),
+    ).toMatchObject({ profile: { runner: "opencode", variant: "high" } });
+    expect(
+      skillbenchAutomationRequestSchema.parse({
+        command: "eval",
+        source: "./skill",
+        evals: "evals/development",
+        profile: { runner: "opencode" },
+      }),
+    ).toMatchObject({ profile: { runner: "opencode" } });
     expect(() =>
       skillbenchAutomationRequestSchema.parse({
         command: "eval",
@@ -72,5 +92,13 @@ describe("Skillbench invocation contract", () => {
         profile: { runner: "codex", reasoningEffort: "low" },
       }),
     ).toThrow();
+    expect(() =>
+      skillbenchAutomationRequestSchema.parse({
+        command: "eval",
+        source: "./skill",
+        evals: "evals/development",
+        profile: { runner: "opencode", model: "claude-sonnet-4-6" },
+      }),
+    ).toThrow(/provider\/model/u);
   });
 });

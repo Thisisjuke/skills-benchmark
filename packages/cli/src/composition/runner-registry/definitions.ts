@@ -10,6 +10,12 @@ import {
   isCodexExecutionProfile,
   reasoningEffortSchema as codexEffortSchema,
 } from "@skillbench/runner-codex";
+import {
+  createOpenCodeExecutionProfile,
+  isOpenCodeExecutionProfile,
+  openCodeModelSchema,
+  OpenCodeRunner,
+} from "@skillbench/runner-opencode";
 import { SkillbenchError } from "@skillbench/sdk/errors";
 import { MOCK_EXECUTION_PROFILE, MockRunner } from "@skillbench/sdk/runners";
 
@@ -32,12 +38,15 @@ const mockDefinition: RunnerDefinition = {
     comparisonJudge: false,
   },
   defaultExecutable: "mock",
+  supportsModel: false,
+  requiresModel: false,
   efforts: [],
   acceptsEffort: () => false,
-  createChoice(model, effort) {
-    if (model !== undefined || effort !== undefined) {
+  acceptsVariant: false,
+  createChoice(model, effort, variant) {
+    if (model !== undefined || effort !== undefined || variant !== undefined) {
       throw new SkillbenchError(
-        "--model and --reasoning-effort require --runner codex or --runner claude",
+        "--model, --reasoning-effort and --variant require a compatible model runner",
         { code: "CLI_PROFILE_CONFLICT" },
       );
     }
@@ -65,10 +74,14 @@ const codexDefinition: RunnerDefinition = {
     comparisonJudge: true,
   },
   defaultExecutable: "codex",
+  supportsModel: true,
+  requiresModel: true,
   modelPlaceholder: "gpt-5.6-luna",
   efforts: codexEffortSchema.options,
   acceptsEffort: (value) => codexEffortSchema.safeParse(value).success,
-  createChoice(model, effort) {
+  acceptsVariant: false,
+  createChoice(model, effort, variant) {
+    rejectVariant("Codex", variant);
     return {
       runner: "codex",
       model: requiredModel("Codex", model, "CODEX_PROFILE_REQUIRED"),
@@ -117,10 +130,14 @@ const claudeDefinition: RunnerDefinition = {
     comparisonJudge: true,
   },
   defaultExecutable: "claude",
+  supportsModel: true,
+  requiresModel: true,
   modelPlaceholder: "claude-sonnet-4-6",
   efforts: claudeEffortSchema.options,
   acceptsEffort: (value) => claudeEffortSchema.safeParse(value).success,
-  createChoice(model, effort) {
+  acceptsVariant: false,
+  createChoice(model, effort, variant) {
+    rejectVariant("Claude", variant);
     return {
       runner: "claude",
       model: requiredModel("Claude", model, "CLAUDE_PROFILE_REQUIRED"),
@@ -159,8 +176,76 @@ const claudeDefinition: RunnerDefinition = {
   },
 };
 
+const openCodeDefinition: RunnerDefinition = {
+  id: "opencode",
+  name: "OpenCode",
+  label: "OpenCode",
+  hint: "Uses the trusted local OpenCode configuration",
+  capabilities: { incursModelCalls: true, comparisonJudge: true },
+  defaultExecutable: "opencode",
+  supportsModel: true,
+  requiresModel: false,
+  efforts: [],
+  acceptsEffort: () => false,
+  acceptsVariant: true,
+  createChoice(model, effort, variant) {
+    if (effort !== undefined) {
+      throw new SkillbenchError("OpenCode does not accept --reasoning-effort; use --variant", {
+        code: "CLI_PROFILE_CONFLICT",
+      });
+    }
+    const parsedModel = model === undefined ? undefined : openCodeModelSchema.safeParse(model);
+    if (parsedModel !== undefined && !parsedModel.success) {
+      throw new SkillbenchError("OpenCode --model must use provider/model format", {
+        code: "OPENCODE_PROFILE_REQUIRED",
+        cause: parsedModel.error,
+      });
+    }
+    const trimmedVariant = variant?.trim();
+    return {
+      runner: "opencode",
+      ...(parsedModel === undefined ? {} : { model: parsedModel.data }),
+      ...(trimmedVariant === undefined || trimmedVariant === "" ? {} : { variant: trimmedVariant }),
+    };
+  },
+  async create(options, choice) {
+    assertChoice(choice, "opencode");
+    const runner = new OpenCodeRunner(options);
+    return {
+      runner,
+      executionProfile: createOpenCodeExecutionProfile({
+        runnerVersion: await runner.version(),
+        ...(choice.model === undefined ? {} : { model: choice.model }),
+        ...(choice.variant === undefined ? {} : { variant: choice.variant }),
+      }),
+    };
+  },
+  matches: isOpenCodeExecutionProfile,
+  formatProfile(profile) {
+    if (!isOpenCodeExecutionProfile(profile)) return fallbackProfile(profile);
+    return `opencode ${profile.runnerVersion}, ${profile.model ?? "OpenCode default"}${profile.variant === undefined ? "" : `, variant ${profile.variant}`}`;
+  },
+  profileConfig(profile) {
+    if (!isOpenCodeExecutionProfile(profile)) return fallbackConfig(profile);
+    return {
+      type: "opencode",
+      ...(profile.model === undefined ? {} : { model: profile.model }),
+      ...(profile.variant === undefined ? {} : { variant: profile.variant }),
+    };
+  },
+};
+
 export const runnerDefinitions: readonly RunnerDefinition[] = Object.freeze([
   mockDefinition,
   codexDefinition,
   claudeDefinition,
+  openCodeDefinition,
 ]);
+
+function rejectVariant(provider: string, variant: string | undefined): void {
+  if (variant !== undefined) {
+    throw new SkillbenchError(`${provider} does not accept --variant`, {
+      code: "CLI_PROFILE_CONFLICT",
+    });
+  }
+}

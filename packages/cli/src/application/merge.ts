@@ -9,8 +9,7 @@ import type { ApplicationContext, OperationEvents, OutputRequest } from "./conte
 import { resolveApplicationSource } from "./source";
 import type { WrittenBundle } from "../bundles";
 import { effectiveRunConfig } from "./effective-config";
-import type { RunnerChoice } from "../composition/runner-registry";
-import type { SkillbenchConfig } from "../config";
+import type { RunnerSelection, SkillbenchConfig } from "../config";
 import { createMergeComparisonStage } from "./merge/comparison";
 import {
   generateMergeCandidates,
@@ -27,7 +26,7 @@ import {
 export type MergeRequest = OutputRequest & {
   config: SkillbenchConfig;
   projectRoot: string;
-  selectRunner: () => Promise<RunnerChoice>;
+  selectRunner: () => Promise<RunnerSelection>;
   sourceA: string;
   sourceB: string;
   resolveOptionsA: ResolveOptions;
@@ -76,15 +75,20 @@ export async function executeMerge(
         ),
       ] as const,
   );
-  const runnerChoice = await request.selectRunner();
+  const runnerSelection = await request.selectRunner();
   const runtime = await context.executionRuntime(
     request.config,
-    runnerChoice,
+    runnerSelection,
     request.projectRoot,
   );
   const repeat = request.repeat ?? request.config.eval.repeat;
-  const effectiveConfig = effectiveRunConfig(request.config, repeat, runtime.executionProfile);
-  const permissions = createRunnerPermissions(request.config.runner.sandbox);
+  const effectiveConfig = effectiveRunConfig(
+    request.config,
+    repeat,
+    runtime.executionProfile,
+    runtime.configuration,
+  );
+  const permissions = createRunnerPermissions(runtime.configuration.sandbox);
   const comparisonStage = createMergeComparisonStage({
     context,
     config: request.config,

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { loadEvalSuite } from "@skillbench/sdk/evaluator";
 
+import { loadConfig } from "../src/config";
 import { initializeProject, shouldRecommendInitialization } from "../src/init";
 
 describe("initializeProject", () => {
@@ -119,6 +120,42 @@ describe("initializeProject", () => {
       'directory: "artifacts/skillbench"',
     );
     expect(existsSync(join(cwd, "artifacts"))).toBe(false);
+  });
+
+  it("renders an OpenCode profile with an optional variant", () => {
+    const withVariant = mkdtempSync(join(tmpdir(), "skillbench-init-opencode-"));
+    initializeProject(withVariant, {
+      profile: {
+        runner: "opencode",
+        model: "anthropic/claude-sonnet-4-6",
+        variant: "high",
+      },
+    });
+    expect(readFileSync(join(withVariant, ".skillbench", "config.yaml"), "utf8")).toContain(
+      'variant: "high"',
+    );
+    expect(loadConfig({ cwd: withVariant }).config.runners[0]).toMatchObject({
+      type: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      variant: "high",
+    });
+
+    const withoutVariant = mkdtempSync(join(tmpdir(), "skillbench-init-opencode-"));
+    initializeProject(withoutVariant, {
+      profile: { runner: "opencode", model: "openai/gpt-5.2-codex" },
+    });
+    const config = readFileSync(join(withoutVariant, ".skillbench", "config.yaml"), "utf8");
+    expect(config).toContain('model: "openai/gpt-5.2-codex"');
+    expect(config).not.toContain("variant:");
+
+    const automatic = mkdtempSync(join(tmpdir(), "skillbench-init-opencode-"));
+    initializeProject(automatic, { profile: { runner: "opencode" } });
+    const automaticConfig = readFileSync(join(automatic, ".skillbench", "config.yaml"), "utf8");
+    expect(automaticConfig).not.toContain("    model:");
+    expect(loadConfig({ cwd: automatic }).config.runners[0]).toMatchObject({
+      type: "opencode",
+    });
+    expect(loadConfig({ cwd: automatic }).config.runners[0]?.model).toBeUndefined();
   });
 
   it("recognizes an initialized project from a nested directory", () => {

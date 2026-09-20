@@ -1,5 +1,6 @@
 import type { ClaudeEffort } from "@skillbench/runner-claude";
 import type { ReasoningEffort } from "@skillbench/runner-codex";
+import type { OpenCodeExecutionProfile } from "@skillbench/runner-opencode";
 import type { Logger } from "@skillbench/sdk/logging";
 import type {
   ExecutionProfile,
@@ -11,7 +12,13 @@ import type { RunnerEffort } from "@skillbench/invocation-contract";
 export type RunnerChoice =
   | { runner: "mock"; model?: undefined; reasoningEffort?: undefined }
   | { runner: "codex"; model: string; reasoningEffort: ReasoningEffort }
-  | { runner: "claude"; model: string; reasoningEffort: ClaudeEffort };
+  | { runner: "claude"; model: string; reasoningEffort: ClaudeEffort }
+  | {
+      runner: "opencode";
+      model?: string;
+      reasoningEffort?: undefined;
+      variant?: OpenCodeExecutionProfile["variant"];
+    };
 
 export type RegisteredRunnerOptions = {
   executable: string;
@@ -35,10 +42,17 @@ export type RunnerDefinition = {
     comparisonJudge: boolean;
   };
   defaultExecutable: string;
+  supportsModel: boolean;
+  requiresModel: boolean;
   modelPlaceholder?: string;
   efforts: readonly RunnerEffort[];
   acceptsEffort(value: string): boolean;
-  createChoice(model: string | undefined, effort: RunnerEffort | undefined): RunnerChoice;
+  acceptsVariant: boolean;
+  createChoice(
+    model: string | undefined,
+    effort: RunnerEffort | undefined,
+    variant: string | undefined,
+  ): RunnerChoice;
   create(options: RegisteredRunnerOptions, choice: RunnerChoice): Promise<RegisteredRunner>;
   matches(profile: ExecutionProfile): boolean;
   formatProfile(profile: ExecutionProfile): string;

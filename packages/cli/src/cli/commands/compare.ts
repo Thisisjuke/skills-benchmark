@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 
 import { executeCompare } from "../../application";
+import { addConfiguredRunner } from "../../config";
 import type { EvalPartition } from "@skillbench/sdk/evaluator";
 import type { ExecutionCommandContext } from "../command-context";
 import {
@@ -61,14 +62,23 @@ export function registerCompareCommand(program: Command, context: ExecutionComma
       ) => {
         validateOutputOptions(options);
         const session = context.sessionFor(command, options.json === true);
-        const { config, layout, initializationChoice } = await ensureInitializedProject(
+        const { config, configFile, layout, initializationChoice } = await ensureInitializedProject(
           context,
           command,
           options.json === true,
         );
         const globalOptions = getGlobalOptions(command);
         const runnerChoice =
-          initializationChoice ?? (await session.runnerChoice(config, globalOptions));
+          initializationChoice ??
+          (await session.runnerChoice(
+            config,
+            globalOptions,
+            configFile === undefined
+              ? {}
+              : {
+                  onRunnerAdded: (runner) => addConfiguredRunner(configFile, runner),
+                },
+          ));
         const sourceA = await session.requiredText(
           inputA,
           "skill-a",

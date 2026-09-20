@@ -62,4 +62,41 @@ describe("Web job request", () => {
     });
     expect(buildCliArguments(request, "/tmp/output")).toContain("claude");
   });
+
+  it("maps OpenCode model and optional variant without reasoning effort", () => {
+    const request = webJobRequestSchema.parse({
+      command: "eval",
+      source: "./skill",
+      evals: "./evals/development",
+      profile: {
+        runner: "opencode",
+        model: "anthropic/claude-sonnet-4-6",
+        variant: "high",
+      },
+    });
+    const argv = buildCliArguments(request, "/tmp/output");
+    expect(argv).toEqual(
+      expect.arrayContaining([
+        "--runner",
+        "opencode",
+        "--model",
+        "anthropic/claude-sonnet-4-6",
+        "--variant",
+        "high",
+      ]),
+    );
+    expect(argv).not.toContain("--reasoning-effort");
+  });
+
+  it("lets OpenCode choose its model when the profile omits one", () => {
+    const request = webJobRequestSchema.parse({
+      command: "eval",
+      source: "./skill",
+      evals: "./evals/development",
+      profile: { runner: "opencode" },
+    });
+    const argv = buildCliArguments(request, "/tmp/output");
+    expect(argv).toEqual(expect.arrayContaining(["--runner", "opencode"]));
+    expect(argv).not.toContain("--model");
+  });
 });

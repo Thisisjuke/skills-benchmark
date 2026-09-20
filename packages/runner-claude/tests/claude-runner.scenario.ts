@@ -17,7 +17,7 @@ const policy = { maxFileSizeBytes: 1_000_000, maxSnapshotSizeBytes: 5_000_000 };
 const fakeClaude = resolve("tests/fixtures/fake-claude.ts");
 const executionProfile = {
   runner: "claude" as const,
-  runnerVersion: "2.1.128 (Claude Code)",
+  runnerVersion: "2.1.259 (Claude Code)",
   model: "claude-sonnet-4-6",
   effort: "low" as const,
 };
@@ -75,7 +75,7 @@ describe("ClaudeRunner", () => {
       tokens: { input: 17, output: 6 },
       trace: {
         protocol: "claude-print-json-v1",
-        version: "2.1.128 (Claude Code)",
+        version: "2.1.259 (Claude Code)",
         executionProfile,
         sessionId: "fake-session",
         numTurns: 2,
@@ -92,8 +92,13 @@ describe("ClaudeRunner", () => {
     ) as string[];
     expect(argv.at(-1)).toBe(runInput.prompt);
     expect(argv).toContain("--no-session-persistence");
+    expect(argv).not.toContain("--bare");
+    expect(argv).toContain("--restricted");
+    expect(argv).toContain("--permission-prompts");
+    expect(argv).toContain("none");
     expect(argv).toContain("--strict-mcp-config");
-    expect(argv).toContain("--setting-sources");
+    expect(argv).not.toContain("--add-dir");
+    expect(argv).not.toContain("--setting-sources");
     expect(argv).toContain("--effort");
     expect(argv).toContain("low");
     expect(argv).toContain("acceptEdits");
@@ -133,6 +138,9 @@ describe("ClaudeRunner", () => {
       new ClaudeRunner({ executable: "/definitely/missing/claude" }).version(),
     ).rejects.toMatchObject({
       code: "CLAUDE_NOT_FOUND",
+    });
+    await expect(runner("unsupported-version").version()).rejects.toMatchObject({
+      code: "CLAUDE_VERSION_UNSUPPORTED",
     });
   });
 });

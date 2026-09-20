@@ -23,12 +23,12 @@ export function createCodexExecutionProfile(input: {
   reasoningEffort?: ReasoningEffort;
 }): CodexExecutionProfile {
   const missing = [
-    ...(input.model === undefined ? ["runner.model"] : []),
-    ...(input.reasoningEffort === undefined ? ["runner.reasoningEffort"] : []),
+    ...(input.model === undefined ? ["model"] : []),
+    ...(input.reasoningEffort === undefined ? ["reasoningEffort"] : []),
   ];
   if (missing.length > 0) {
     throw new SkillbenchError(
-      `Codex execution requires an explicit ${missing.join(" and ")} in .skillbench/config.yaml`,
+      `Codex execution requires an explicit ${missing.join(" and ")} in its configured runner profile`,
       { code: "CODEX_PROFILE_REQUIRED" },
     );
   }

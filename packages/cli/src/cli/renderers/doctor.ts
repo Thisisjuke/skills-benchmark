@@ -5,7 +5,9 @@ export function renderDoctor(result: DoctorResult): string {
   const runnerStatus = result.runner.configured
     ? `${result.runner.runner} (${
         result.runner.available
-          ? (result.runner.version ?? "available")
+          ? result.runner.supported
+            ? (result.runner.version ?? "available")
+            : `${result.runner.version ?? "unknown version"} — unsupported — ${result.runner.remediation}`
           : `unavailable — ${result.runner.remediation}`
       })`
     : `not configured — ${result.runner.remediation}`;

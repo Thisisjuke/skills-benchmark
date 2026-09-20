@@ -4,6 +4,30 @@
 starts a server on the loopback interface, opens the browser, and associates history,
 sources, events, and bundles with the selected project.
 
+## Supported AI
+
+**Supported AI = Codex, Claude, and models available through OpenCode.** The built-in
+`mock` runner is available for workflow checks without an AI or model charges. See
+[AI prerequisites](#ai-prerequisites) before submitting a model-backed job.
+
+## AI prerequisites
+
+The Web product supports exactly the same runners as the CLI and requires Node.js
+22.22.2 or newer. Provider executables and credentials must be visible to the process
+that starts `skillbench-web`.
+
+| Runner | What the Web process needs |
+| --- | --- |
+| `mock` | No external executable or account; results are not a meaningful quality ranking. |
+| `codex` | An authenticated `codex` CLI on `PATH`, plus an explicit model and reasoning effort. No fixed CLI version range is currently enforced. |
+| `claude` | An authenticated `claude` CLI on `PATH`, version `>=2.1.259 <3.0.0`, plus an explicit model and effort. |
+| `opencode` | An `opencode` CLI on `PATH`, version `>=1.18.12 <2.0.0`, with at least one provider configured and authenticated. The form can pass an explicit `provider/model` or let OpenCode resolve it. |
+
+Skillbench does not install or authenticate these CLIs. Initialize the project with the
+CLI, run `skillbench doctor`, and see the CLI's [full runner
+guide](../../packages/cli/README.md#choose-a-runner-and-control-cost) for provider-specific
+security and reproducibility details.
+
 This product is distinct from `@thisisjuke/skillbench`: it owns SQLite, but runs the exact CLI
 version as a subprocess for every operation.
 

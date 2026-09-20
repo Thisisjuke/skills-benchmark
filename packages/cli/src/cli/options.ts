@@ -24,6 +24,7 @@ export type GlobalOptions = {
   offline?: boolean;
   reasoningEffort?: RunnerEffort;
   runner?: RunnerType;
+  variant?: string;
   yes?: boolean;
 };
 
@@ -82,6 +83,7 @@ export function globalArguments(
     ...(!includeProfile || options.reasoningEffort === undefined
       ? []
       : ["--reasoning-effort", options.reasoningEffort]),
+    ...(!includeProfile || options.variant === undefined ? [] : ["--variant", options.variant]),
     ...(options.input === false ? ["--no-input"] : []),
     ...(options.history === false ? ["--no-history"] : []),
     ...(options.jsonl === true ? ["--jsonl"] : []),

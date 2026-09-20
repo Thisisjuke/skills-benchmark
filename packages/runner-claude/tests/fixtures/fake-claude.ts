@@ -4,7 +4,9 @@ import { join } from "node:path";
 const args = process.argv.slice(2);
 
 if (args.includes("--version")) {
-  process.stdout.write("2.1.128 (Claude Code)\n");
+  process.stdout.write(
+    `${process.env.SKILLBENCH_FAKE_CLAUDE_MODE === "unsupported-version" ? "2.1.258" : "2.1.259"} (Claude Code)\n`,
+  );
   process.exit(0);
 }
 

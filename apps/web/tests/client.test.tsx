@@ -39,6 +39,17 @@ describe("Skillbench Web client", () => {
       ".skillbench/evals/development/default.yaml",
     );
 
+    await userEvent.selectOptions(screen.getByLabelText("Runner"), "opencode");
+    expect(screen.getByLabelText("Choisir explicitement le modèle OpenCode")).toBeTruthy();
+    expect(screen.getByLabelText("Variant OpenCode (optionnel)")).toBeTruthy();
+    expect(screen.queryByLabelText("Effort de raisonnement")).toBeNull();
+    expect(screen.queryByLabelText("Modèle OpenCode")).toBeNull();
+    await userEvent.selectOptions(
+      screen.getByLabelText("Choisir explicitement le modèle OpenCode"),
+      "yes",
+    );
+    expect(screen.getByLabelText("Modèle OpenCode")).toBeTruthy();
+
     await userEvent.click(screen.getByRole("tab", { name: "inspect" }));
     expect(screen.queryByLabelText("Source B")).toBeNull();
     expect(screen.queryByLabelText("Suite d’évaluation")).toBeNull();

@@ -60,6 +60,12 @@ const products = {
     allowedInternalDependencies: ["invocationContract", "sdk", "runnerKit", "testContracts"],
     forbiddenDependencyGroups: ["terminal", "github", "assertions", "web"],
   },
+  runnerOpenCode: {
+    path: "packages/runner-opencode",
+    name: "@skillbench/runner-opencode",
+    allowedInternalDependencies: ["invocationContract", "sdk", "runnerKit", "testContracts"],
+    forbiddenDependencyGroups: ["terminal", "github", "assertions", "web"],
+  },
   sourceGithub: {
     path: "packages/source-github",
     name: "@skillbench/source-github",
@@ -81,6 +87,7 @@ const products = {
       "assertionsPromptfoo",
       "runnerClaude",
       "runnerCodex",
+      "runnerOpenCode",
       "sourceGithub",
       "testContracts",
     ],
@@ -269,6 +276,7 @@ for (const [key, product] of Object.entries(products)) {
           key === "runnerKit" ||
           key === "runnerClaude" ||
           key === "runnerCodex" ||
+          key === "runnerOpenCode" ||
           key === "sourceGithub" ||
           key === "testContracts") &&
         specifier === "@skillbench/sdk"
@@ -304,6 +312,7 @@ for (const key of [
   "runnerKit",
   "runnerClaude",
   "runnerCodex",
+  "runnerOpenCode",
   "sourceGithub",
   "testContracts",
 ]) {
@@ -317,7 +326,7 @@ if (manifests.cli.devDependencies?.[products.sdk.name] !== workspaceProtocol) {
 if (manifests.cli.dependencies?.[products.sdk.name] !== undefined) {
   fail("@thisisjuke/skillbench must bundle the private SDK");
 }
-for (const key of ["runnerClaude", "runnerCodex"]) {
+for (const key of ["runnerClaude", "runnerCodex", "runnerOpenCode"]) {
   if (manifests[key].devDependencies?.[products.runnerKit.name] !== workspaceProtocol) {
     fail(
       `${products[key].name} must build against the local ${products.runnerKit.name} workspace`,
@@ -329,7 +338,13 @@ for (const key of ["runnerClaude", "runnerCodex"]) {
     );
   }
 }
-for (const key of ["assertionsPromptfoo", "runnerClaude", "runnerCodex", "sourceGithub"]) {
+for (const key of [
+  "assertionsPromptfoo",
+  "runnerClaude",
+  "runnerCodex",
+  "runnerOpenCode",
+  "sourceGithub",
+]) {
   if (manifests.cli.devDependencies?.[products[key].name] !== workspaceProtocol) {
     fail(`@thisisjuke/skillbench must build against local ${products[key].name}`);
   }
@@ -344,7 +359,13 @@ if (typeof promptfooVersion !== "string" || !/^\d+\.\d+\.\d+$/u.test(promptfooVe
 if (manifests.cli.dependencies?.promptfoo !== promptfooVersion) {
   fail("@thisisjuke/skillbench and its assertion adapter must use the same Promptfoo version");
 }
-for (const key of ["assertionsPromptfoo", "runnerClaude", "runnerCodex", "sourceGithub"]) {
+for (const key of [
+  "assertionsPromptfoo",
+  "runnerClaude",
+  "runnerCodex",
+  "runnerOpenCode",
+  "sourceGithub",
+]) {
   if (
     manifests[key].devDependencies?.["@skillbench/test-contracts"] !== workspaceProtocol
   ) {
@@ -360,6 +381,7 @@ for (const key of [
   "runnerKit",
   "runnerClaude",
   "runnerCodex",
+  "runnerOpenCode",
   "sourceGithub",
   "testContracts",
 ]) {
@@ -368,7 +390,7 @@ for (const key of [
     fail(`${products[key].name} must not declare publishConfig`);
   }
 }
-for (const key of ["sdk", "runnerClaude", "runnerCodex", "testContracts"]) {
+for (const key of ["sdk", "runnerClaude", "runnerCodex", "runnerOpenCode", "testContracts"]) {
   if (
     manifests[key].dependencies?.[products.invocationContract.name] !== workspaceProtocol
   ) {

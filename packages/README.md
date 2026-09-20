@@ -13,10 +13,11 @@ artifact; “test” means a development-only contract dependency.
 | --- | --- | --- | --- |
 | [`invocation-contract`](invocation-contract/README.md) | private contract | none | SDK, CLI, runners, test contracts |
 | [`sdk`](sdk/README.md) | private production module | invocation contract | CLI, adapters, runner kit, test contracts |
-| [`runner-kit`](runner-kit/README.md) | private production module | SDK | Codex and Claude runners (build) |
+| [`runner-kit`](runner-kit/README.md) | private production module | SDK | Codex, Claude, and OpenCode runners (build) |
 | [`test-contracts`](test-contracts/README.md) | private test support | invocation contract, SDK | runners, GitHub source, Promptfoo assertions, CLI tests |
 | [`runner-codex`](runner-codex/README.md) | private adapter | invocation contract, SDK, runner kit (build), test contracts (test) | CLI (build) |
 | [`runner-claude`](runner-claude/README.md) | private adapter | invocation contract, SDK, runner kit (build), test contracts (test) | CLI (build) |
+| [`runner-opencode`](runner-opencode/README.md) | private adapter | invocation contract, SDK, runner kit (build), test contracts (test) | CLI (build) |
 | [`source-github`](source-github/README.md) | private adapter | SDK, test contracts (test) | CLI (build) |
 | [`assertions-promptfoo`](assertions-promptfoo/README.md) | private adapter | SDK, test contracts (test) | CLI (build) |
 | [`cli`](cli/README.md) | public product | invocation contract, SDK, adapters; test contracts (test) | [Web application](../apps/web/README.md) |

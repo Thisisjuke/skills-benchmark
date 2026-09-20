@@ -42,7 +42,8 @@ const profile = createClaudeExecutionProfile({
 ## Adapter guarantees
 
 - automatic sessions and memory disabled;
-- settings limited to the project and implicit MCP servers rejected;
+- restricted mode, non-interactive permission prompts, and implicit MCP servers rejected;
+- user and project settings are ignored while the installed CLI authentication remains available;
 - explicit model, effort, version, and permissions;
 - read-only tools in `read-only` mode;
 - Claude sandbox fails closed for `workspace-write`;
@@ -52,7 +53,9 @@ const profile = createClaudeExecutionProfile({
 - Claude details preserved in a versioned `RunnerTrace`.
 
 The skill is materialized under `.claude/skills`. Write mode never silently falls back
-to unsandboxed execution.
+to unsandboxed execution. Claude Code `>=2.1.259 <3.0.0` is required because this
+adapter depends on the restricted and non-interactive permission controls introduced
+in that CLI generation.
 
 ## Structure
 

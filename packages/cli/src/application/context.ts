@@ -3,8 +3,7 @@ import type { SkillSourceService } from "@skillbench/sdk/sources";
 
 import type { WriteBundleInput, WrittenBundle } from "../bundles";
 import type { ExecutionRuntime } from "../composition/execution-runtime";
-import type { RunnerChoice } from "../composition/runner-registry";
-import type { SkillbenchConfig } from "../config";
+import type { RunnerSelection, SkillbenchConfig } from "../config";
 import type { NewCliHistoryEntry } from "../history";
 import type { PreflightInput } from "./preflight";
 
@@ -22,7 +21,7 @@ export type ApplicationContext = {
   sourceService: (config: SkillbenchConfig, projectRoot: string) => SkillSourceService;
   executionRuntime: (
     config: SkillbenchConfig,
-    choice: RunnerChoice,
+    selection: RunnerSelection,
     projectRoot: string,
   ) => Promise<ExecutionRuntime>;
   writeBundle: (input: Omit<WriteBundleInput, "jobId">) => WrittenBundle;

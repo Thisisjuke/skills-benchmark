@@ -1,5 +1,5 @@
-runner:
-  type: mock
+runners:
+  - type: mock
 eval:
   repeat: 3
   timeoutMs: 5000

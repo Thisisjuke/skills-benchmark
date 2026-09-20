@@ -28,7 +28,7 @@ describe("Claude execution profile", () => {
 
   it("rejects missing values and unknown profile keys", () => {
     expect(() => createClaudeExecutionProfile({ runnerVersion: "2.1.128 (Claude Code)" })).toThrow(
-      /runner\.model.*runner\.reasoningEffort/u,
+      /model.*reasoningEffort.*configured runner profile/u,
     );
     expect(
       claudeExecutionProfileSchema.safeParse({

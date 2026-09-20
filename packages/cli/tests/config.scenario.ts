@@ -1,12 +1,12 @@
 // Registered by the CLI project lifecycle scenario suite.
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { loadConfig } from "../src/config";
+import { addConfiguredRunner, loadConfig } from "../src/config";
 
 function writeConfig(cwd: string, content: string): void {
   mkdirSync(join(cwd, ".skillbench"), { recursive: true });
@@ -19,9 +19,10 @@ describe("loadConfig", () => {
     const { config, configFile } = loadConfig({ cwd });
 
     expect(configFile).toBeUndefined();
-    expect(config.runner.type).toBe("codex");
-    expect(config.runner).toMatchObject({
-      executable: "codex",
+    expect(config.runners).toHaveLength(1);
+    expect(config.runners[0]).toMatchObject({
+      type: "mock",
+      executable: "mock",
       sandbox: "workspace-write",
       maxOutputBytes: 1024 * 1024,
     });
@@ -79,29 +80,29 @@ describe("loadConfig", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
     writeConfig(
       cwd,
-      "runner:\n  type: codex\n  model: gpt-example\n  reasoningEffort: high\n  sandbox: read-only\n  maxOutputBytes: 2048\n",
+      "runners:\n  - type: codex\n    model: gpt-example\n    reasoningEffort: high\n    sandbox: read-only\n    maxOutputBytes: 2048\n",
     );
-    expect(loadConfig({ cwd }).config.runner).toMatchObject({
+    expect(loadConfig({ cwd }).config.runners[0]).toMatchObject({
       model: "gpt-example",
       reasoningEffort: "high",
       sandbox: "read-only",
       maxOutputBytes: 2048,
     });
 
-    writeConfig(cwd, "runner:\n  sandbox: danger-full-access\n");
-    expect(() => loadConfig({ cwd })).toThrow(/runner\.sandbox/u);
+    writeConfig(cwd, "runners:\n  - type: mock\n    sandbox: danger-full-access\n");
+    expect(() => loadConfig({ cwd })).toThrow(/runners\.0\.sandbox/u);
 
-    writeConfig(cwd, "runner:\n  reasoningEffort: extreme\n");
-    expect(() => loadConfig({ cwd })).toThrow(/runner\.reasoningEffort/u);
+    writeConfig(cwd, "runners:\n  - type: codex\n    reasoningEffort: extreme\n");
+    expect(() => loadConfig({ cwd })).toThrow(/runners\.0\.reasoningEffort/u);
   });
 
   it("selects Claude defaults and validates its effort levels", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-"));
     writeConfig(
       cwd,
-      "runner:\n  type: claude\n  model: claude-sonnet-4-6\n  reasoningEffort: max\n",
+      "runners:\n  - type: claude\n    model: claude-sonnet-4-6\n    reasoningEffort: max\n",
     );
-    expect(loadConfig({ cwd }).config.runner).toMatchObject({
+    expect(loadConfig({ cwd }).config.runners[0]).toMatchObject({
       type: "claude",
       executable: "claude",
       model: "claude-sonnet-4-6",
@@ -110,9 +111,68 @@ describe("loadConfig", () => {
 
     writeConfig(
       cwd,
-      "runner:\n  type: claude\n  reasoningEffort: minimal\n",
+      "runners:\n  - type: claude\n    model: claude-sonnet-4-6\n    reasoningEffort: minimal\n",
     );
     expect(() => loadConfig({ cwd })).toThrow(/Claude effort/u);
+  });
+
+  it("loads an OpenCode profile and keeps variant provider-specific", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-opencode-"));
+    writeConfig(
+      cwd,
+      "runners:\n  - type: opencode\n    model: anthropic/claude-sonnet-4-6\n    variant: high\n",
+    );
+    expect(loadConfig({ cwd }).config.runners[0]).toMatchObject({
+      type: "opencode",
+      executable: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      variant: "high",
+    });
+
+    writeConfig(cwd, "runners:\n  - type: opencode\n    reasoningEffort: low\n");
+    expect(() => loadConfig({ cwd })).toThrow(/reasoningEffort.*OpenCode/u);
+    writeConfig(cwd, "runners:\n  - type: codex\n    model: gpt-test\n    reasoningEffort: low\n    variant: high\n");
+    expect(() => loadConfig({ cwd })).toThrow(/variant.*Codex/u);
+  });
+
+  it("appends complete runners without replacing the config", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-runners-"));
+    writeConfig(
+      cwd,
+      [
+        "# keep this comment",
+        "runners:",
+        "  - type: codex",
+        "    model: gpt-existing",
+        "    reasoningEffort: low",
+        "",
+      ].join("\n"),
+    );
+    const configFile = join(cwd, ".skillbench", "config.yaml");
+
+    const added = {
+      type: "opencode" as const,
+      executable: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      variant: "high",
+      sandbox: "workspace-write" as const,
+      maxOutputBytes: 1024 * 1024,
+    };
+    addConfiguredRunner(configFile, added);
+    addConfiguredRunner(configFile, added);
+
+    expect(loadConfig({ cwd }).config.runners).toHaveLength(2);
+    expect(loadConfig({ cwd }).config.runners[1]).toMatchObject(added);
+    const source = readFileSync(configFile, "utf8");
+    expect(source).toContain("# keep this comment");
+    expect(source.match(/anthropic\/claude-sonnet-4-6/gu)).toHaveLength(1);
+  });
+
+  it("requires manual migration for the legacy runner field", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-config-legacy-runner-"));
+    writeConfig(cwd, "runner:\n  type: mock\n");
+
+    expect(() => loadConfig({ cwd })).toThrow(/migrate it manually to the runners list/u);
   });
 
   it("can disable the pinned Promptfoo assertion adapter explicitly", () => {
@@ -183,7 +243,7 @@ describe("loadConfig", () => {
 
     expect(published.config.outputs.directory).toBe(".skillbench/runs");
     expect(offline.config).toMatchObject({
-      runner: { type: "mock" },
+      runners: [{ type: "mock" }],
       outputs: { directory: ".skillbench/runs" },
     });
   });

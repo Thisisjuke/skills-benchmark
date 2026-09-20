@@ -10,6 +10,28 @@ It accepts local folders or GitHub sources, resolves them to fingerprinted snaps
 and runs reproducible evaluation suites. Use it as a one-off `npx` command; Promptfoo's
 assertion engine is already included.
 
+## Supported AI
+
+**Supported AI = Codex, Claude, and models available through OpenCode.** The built-in
+`mock` runner exercises the workflow without an AI or model charges. See
+[AI prerequisites](#ai-prerequisites) before selecting a model-backed runner.
+
+## AI prerequisites
+
+Skillbench requires Node.js 22.22.2 or newer. It calls provider CLIs already installed
+on the same machine; it does not install them, authenticate them, or grant model access.
+
+| Runner | Prerequisites | Profile required by Skillbench |
+| --- | --- | --- |
+| `mock` | No external executable or account. | No model or effort; results are not a meaningful quality ranking. |
+| `codex` | An authenticated [`codex` CLI](https://developers.openai.com/codex/cli) on `PATH`. No fixed version range is currently enforced; the CLI must support Skillbench's non-interactive JSONL invocation. | Model plus `minimal`, `low`, `medium`, `high`, or `xhigh` effort. |
+| `claude` | An authenticated [Claude Code](https://code.claude.com/docs/en/setup) CLI on `PATH`, version `>=2.1.259 <3.0.0`. | Model plus `low`, `medium`, `high`, `xhigh`, or `max` effort. |
+| `opencode` | An [OpenCode](https://opencode.ai/docs/providers) CLI on `PATH`, version `>=1.18.12 <2.0.0`, with at least one provider configured and authenticated. | An optional `provider/model` identifier and optional provider-specific variant. Without a model, OpenCode resolves one from its configuration. |
+
+Run `npx @thisisjuke/skillbench doctor` after initialization to verify the selected
+executable and its detected version. Authentication and model access are confirmed only
+when the provider accepts a real run.
+
 The public package bundles private monorepo modules; they are architectural boundaries, not
 packages to install. See the [package map](../README.md) for their source directories.
 
@@ -105,7 +127,8 @@ npx @thisisjuke/skillbench init --no-input
 ```
 
 This keeps the experiment isolated and selects the free mock runner. Replace the last
-command with interactive `init` if you want a meaningful Codex- or Claude-backed result.
+command with interactive `init` if you want a meaningful Codex-, Claude-, or
+OpenCode-backed result.
 
 ### 1. Inspect a remote Thisisjuke skill
 
@@ -153,8 +176,9 @@ npx @thisisjuke/skillbench merge \
   --output ./results/domain-modeling.skillbench
 ```
 
-With interactive Codex or Claude, Skillbench shows a preflight before paid calls. With
-`init --no-input`, all three examples use the free mock runner and serve as a smoke test.
+With interactive Codex, Claude, or OpenCode, Skillbench shows a preflight before paid
+calls. With `init --no-input`, all three examples use the free mock runner and serve as
+a smoke test.
 
 ## Use local and remote sources
 
@@ -212,16 +236,24 @@ directory explicitly remains useful for multi-case suites.
 
 ## Choose a runner and control cost
 
-The registered runners are `mock`, `codex`, and `claude`.
+The registered runners and their required profiles are summarized in
+[AI prerequisites](#ai-prerequisites). `.skillbench/config.yaml` stores an ordered
+`runners` list of complete profiles; the first entry is the default. An interactive
+command first offers that default. Decline it to select any saved profile without
+re-entering its settings, or choose **Add a runner** to configure and persist another
+Codex, Claude, OpenCode, or mock profile. Multiple profiles may use the same provider.
 
-- `mock` is free and deterministic. Use it to validate configuration and automation.
-- `codex` and `claude` require their installed and authenticated executable.
-- Model and reasoning effort are explicit; Skillbench does not silently inherit a
-  personal model choice.
+Codex and Claude profiles require an explicit model and reasoning effort. For OpenCode,
+the default is to leave the model and reasoning effort unset so its existing local
+configuration chooses the model. Choosing a `provider/model` (for example
+`anthropic/claude-sonnet-4-6`) and a provider-specific variant is optional.
 
-Codex accepts `minimal`, `low`, `medium`, `high`, or `xhigh` reasoning effort. Claude
-accepts `low`, `medium`, `high`, `xhigh`, or `max`. The mock runner uses neither a model
-nor reasoning effort.
+OpenCode is intentionally a trusted-local-configuration runner. Skillbench invokes the
+existing non-interactive CLI, inherits its providers, credentials, environment, and user
+configuration, disables plugins with `--pure`, installs a restrictive per-attempt agent,
+and deletes the exact generated session afterward. It does not install or authenticate
+OpenCode, and it is not hermetic: global OpenCode instructions may still affect a run.
+OpenCode `>=1.18.12 <2.0.0` is supported.
 
 In interactive mode, the preflight shows resolved sources, fingerprints or commits,
 suite, repetitions, runner profile, and estimated call count. `--yes` accepts that
@@ -231,10 +263,8 @@ One repetition is fastest but most sensitive to variance. Two or three repetitio
 more stable signal; ten performs roughly ten times as many executions per case and skill. The
 preflight shows the resulting execution and model-call estimate before the run starts.
 
-When `.skillbench/config.yaml` contains a complete runner profile, an interactive
-command first offers to reuse it and shows the runner, model, effort, and sandbox.
-Accepting skips the detailed profile questions. Declining selects a one-run override
-without rewriting the project configuration.
+In non-interactive mode, Skillbench uses the first configured profile unless explicit
+runner flags override it. Flag overrides apply to that run only and are not persisted.
 
 ```sh
 npx @thisisjuke/skillbench \
@@ -247,8 +277,48 @@ npx @thisisjuke/skillbench \
   --repeat 1
 ```
 
-If a flag selects a different provider from `.skillbench/config.yaml`, also provide that
-provider's model and reasoning effort. Values are never reused across providers.
+If a flag selects Codex or Claude without matching a complete saved profile, also provide
+that provider's model and reasoning effort. Values are never reused across providers.
+
+An equivalent non-interactive OpenCode selection is:
+
+```sh
+npx @thisisjuke/skillbench \
+  --runner opencode \
+  --model anthropic/claude-sonnet-4-6 \
+  --variant high \
+  --no-input \
+  --yes \
+  compare ./skill-a ./skill-b \
+  --repeat 1
+```
+
+Omit `--model` to use OpenCode's own model resolution instead. This is convenient, but
+less reproducible because changing OpenCode's local configuration can change later runs.
+
+### Migrate runner configuration
+
+The runner-list format is intentionally not migrated automatically. Before using this
+version, replace the former single `runner` mapping with a non-empty `runners` list:
+
+```yaml
+# Before
+runner:
+  type: codex
+  model: gpt-5.6-luna
+  reasoningEffort: low
+
+# After
+runners:
+  - type: codex
+    model: gpt-5.6-luna
+    reasoningEffort: low
+```
+
+Delete the former `models:` section. To preserve those choices, add each one as a complete
+entry under `runners`; entries may share the same `type`. Put the profile that should be
+used by default first. An OpenCode entry may be as short as `- type: opencode`: omit
+`model`, `reasoningEffort`, and `variant` to inherit OpenCode's local defaults.
 
 ## Understand outputs
 
@@ -334,9 +404,10 @@ Put global options before the command in scripts. Every command also exposes its
 | `-c, --config <path>` | Use an explicit YAML config; `.skillbench/config.yaml` is the only automatically discovered path |
 | `--debug` | Add sanitized diagnostics to stderr |
 | `--offline` | Reject remote sources and network access |
-| `--runner <mock\|codex\|claude>` | Override `runner.type` |
-| `--model <id>` | Set the required Codex or Claude model |
+| `--runner <mock\|codex\|claude\|opencode>` | Override the configured default runner for this invocation |
+| `--model <id>` | Set the required Codex/Claude model or an optional OpenCode `provider/model` |
 | `--reasoning-effort <value>` | Set the provider-specific effort level |
+| `--variant <value>` | Set the optional OpenCode provider variant |
 | `--no-input` | Disable every prompt and fail when a required value is missing |
 | `--no-history` | Disable the comparison MRU |
 | `--jsonl` | Emit only versioned events on stdout |

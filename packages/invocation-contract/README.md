@@ -1,7 +1,7 @@
 # `@skillbench/invocation-contract`
 
 This private package is the data-only contract shared by the Skillbench CLI and Web
-backend. It owns command identifiers, runner and effort identifiers, deterministic
+backend. It owns command identifiers, runner and effort identifiers, validated
 automation requests, and the versioned JSON/JSONL wire envelopes.
 
 It intentionally contains no process spawning, terminal rendering, filesystem access,
@@ -18,7 +18,7 @@ install the CLI or Web package; they never install this workspace independently.
   versioned JSON/JSONL envelopes.
 - **Does not own:** orchestration, processes, terminal UX, HTTP, persistence, or domain services.
 - **Internal dependencies:** none.
-- **Direct dependents:** SDK, CLI, Codex and Claude runners, and test contracts.
+- **Direct dependents:** SDK, CLI, Codex, Claude, and OpenCode runners, and test contracts.
 - **Extension point:** evolve a strict data schema and update every producer and consumer in the
   same change; version protocol-breaking changes.
 

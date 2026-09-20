@@ -14,8 +14,14 @@ export function buildCliArguments(request: WebJobRequest, output: string): strin
   if (request.command !== "inspect") {
     global.push("--runner", request.profile.runner);
     if (request.profile.runner !== "mock") {
-      global.push("--model", request.profile.model);
-      global.push("--reasoning-effort", request.profile.reasoningEffort);
+      if (request.profile.model !== undefined) global.push("--model", request.profile.model);
+      if (request.profile.runner === "opencode") {
+        if (request.profile.variant !== undefined) {
+          global.push("--variant", request.profile.variant);
+        }
+      } else {
+        global.push("--reasoning-effort", request.profile.reasoningEffort);
+      }
     }
   }
 

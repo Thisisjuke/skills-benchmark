@@ -1,10 +1,19 @@
 # Copy the settings you need into .skillbench/config.yaml. Skillbench discovers that
 # canonical path from the current directory or any of its descendants.
-runner:
-  type: codex
-  executable: codex
-  sandbox: workspace-write
-  maxOutputBytes: 1048576
+# The first entry is the default. Interactive commands can use it, select
+# another complete profile, or append a newly configured runner.
+runners:
+  - type: codex
+    executable: codex
+    model: gpt-5.6-luna
+    reasoningEffort: low
+    sandbox: workspace-write
+    maxOutputBytes: 1048576
+  - type: opencode
+    executable: opencode
+    # model and variant are optional. When omitted, OpenCode uses its local defaults.
+    sandbox: workspace-write
+    maxOutputBytes: 1048576
 
 eval:
   path: .skillbench/evals/development/default.yaml

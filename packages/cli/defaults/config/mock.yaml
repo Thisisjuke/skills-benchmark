@@ -1,7 +1,7 @@
-runner:
-  type: mock
-  executable: mock
-  sandbox: workspace-write
+runners:
+  - type: mock
+    executable: mock
+    sandbox: workspace-write
 
 eval:
   path: .skillbench/evals/development/default.yaml

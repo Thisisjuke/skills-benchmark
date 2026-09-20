@@ -11,8 +11,8 @@ dependencies.
 - **Does not own:** provider-specific protocol rules, production behavior, live resources, or
   executables.
 - **Internal dependencies:** invocation contract and SDK.
-- **Direct dependents:** Codex and Claude runners, GitHub source, Promptfoo assertions, and CLI
-  tests.
+- **Direct dependents:** Codex, Claude, and OpenCode runners, GitHub source, Promptfoo assertions,
+  and CLI tests.
 - **Extension point:** add a contract only for behavior shared across implementations or
   consumers; keep provider details with their adapter.
 

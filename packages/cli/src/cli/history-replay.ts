@@ -27,6 +27,7 @@ export function historyArguments(entry: CliHistoryEntry): string[] {
     ...(entry.reasoningEffort === undefined
       ? []
       : ["--reasoning-effort", entry.reasoningEffort]),
+    ...(entry.variant === undefined ? [] : ["--variant", entry.variant]),
     "compare",
     entry.sourceA,
     entry.sourceB,

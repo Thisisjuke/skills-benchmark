@@ -14,8 +14,7 @@ import type { ApplicationContext, OperationEvents, OutputRequest } from "./conte
 import { resolveApplicationSource } from "./source";
 import type { WrittenBundle } from "../bundles";
 import { effectiveRunConfig } from "./effective-config";
-import type { RunnerChoice } from "../composition/runner-registry";
-import type { SkillbenchConfig } from "../config";
+import type { RunnerSelection, SkillbenchConfig } from "../config";
 import { loadProjectFileAsset } from "../assets";
 import {
   evaluationRunCount,
@@ -36,7 +35,7 @@ export type CompareResult = ComparisonSummary & {
 export type CompareRequest = OutputRequest & {
   config: SkillbenchConfig;
   projectRoot: string;
-  selectRunner: () => Promise<RunnerChoice>;
+  selectRunner: () => Promise<RunnerSelection>;
   sourceA: string;
   sourceB: string;
   resolveOptionsA: ResolveOptions;
@@ -84,10 +83,10 @@ export async function executeCompare(
         ),
       ] as const,
   );
-  const runnerChoice = await request.selectRunner();
+  const runnerSelection = await request.selectRunner();
   const runtime = await context.executionRuntime(
     request.config,
-    runnerChoice,
+    runnerSelection,
     request.projectRoot,
   );
   const instructionAssets = comparisonInstructionAssets(runtime, suite);
@@ -121,7 +120,12 @@ export async function executeCompare(
       workspaceParent: resolve(request.projectRoot, ".skillbench", "tmp"),
     },
   );
-  const effectiveConfig = effectiveRunConfig(request.config, repeat, runtime.executionProfile);
+  const effectiveConfig = effectiveRunConfig(
+    request.config,
+    repeat,
+    runtime.executionProfile,
+    runtime.configuration,
+  );
   await request.events.confirmPreflight(
     {
       operation: "compare",
@@ -160,7 +164,7 @@ export async function executeCompare(
       repeat,
       timeoutMs: request.config.eval.timeoutMs,
       executionProfile: runtime.executionProfile,
-      permissions: createRunnerPermissions(request.config.runner.sandbox),
+      permissions: createRunnerPermissions(runtime.configuration.sandbox),
       weights: request.config.comparison.weights,
       tieThreshold: request.config.comparison.tieThreshold,
       effectiveConfig,
@@ -237,11 +241,17 @@ export async function executeCompare(
       ...(request.historyOutput === undefined ? {} : { output: request.historyOutput }),
       partition: suite.partition,
       repeat,
-      runner: runnerChoice.runner,
-      ...(runnerChoice.model === undefined ? {} : { model: runnerChoice.model }),
-      ...(runnerChoice.reasoningEffort === undefined
+      runner: runnerSelection.choice.runner,
+      ...(runnerSelection.choice.model === undefined
         ? {}
-        : { reasoningEffort: runnerChoice.reasoningEffort }),
+        : { model: runnerSelection.choice.model }),
+      ...(runnerSelection.choice.reasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: runnerSelection.choice.reasoningEffort }),
+      ...(runnerSelection.choice.runner === "opencode" &&
+      runnerSelection.choice.variant !== undefined
+        ? { variant: runnerSelection.choice.variant }
+        : {}),
     });
   }
   return { result, ...(bundle === undefined ? {} : { bundle }) };

@@ -11,7 +11,11 @@ import type { ExecutionProfile, Runner } from "@skillbench/sdk/runners";
 import { FINGERPRINT_ALGORITHM, fingerprintFiles, type SkillSnapshot } from "@skillbench/sdk/skills";
 
 import { assetSkillFile, loadProjectRuntimeAssets, type ProjectRuntimeAssets } from "../assets";
-import type { SkillbenchConfig } from "../config";
+import {
+  selectionForChoice,
+  type ConfiguredRunner,
+  type SkillbenchConfig,
+} from "../config";
 import { createProjectLayout } from "../project";
 import { runnerDefinition, type RunnerChoice } from "./runner-registry";
 
@@ -21,6 +25,7 @@ export type ExecutionRuntime = {
   assertions: AssertionEngine;
   judge?: ComparisonJudge;
   instructionAssets: ProjectRuntimeAssets;
+  configuration: ConfiguredRunner;
 };
 
 export async function createExecutionRuntime(
@@ -28,20 +33,23 @@ export async function createExecutionRuntime(
   logger: Logger,
   choice: RunnerChoice,
   projectRoot: string,
+  configuration?: ConfiguredRunner,
 ): Promise<ExecutionRuntime> {
   const assertions = createAssertionEngine(config, logger);
   const instructionAssets = loadProjectRuntimeAssets(projectRoot);
   const definition = runnerDefinition(choice.runner);
+  const selectedConfiguration = configuration ?? executableConfiguration(config, choice);
   logger.debug("runner.create", {
     runner: choice.runner,
     model: choice.model,
     reasoningEffort: choice.reasoningEffort,
+    variant: "variant" in choice ? choice.variant : undefined,
   });
   const runtime = await definition.create(
     {
-      executable: executableForChoice(config, choice),
-      sandbox: config.runner.sandbox,
-      maxOutputBytes: config.runner.maxOutputBytes,
+      executable: selectedConfiguration.executable,
+      sandbox: selectedConfiguration.sandbox,
+      maxOutputBytes: selectedConfiguration.maxOutputBytes,
       logger,
     },
     choice,
@@ -54,18 +62,23 @@ export async function createExecutionRuntime(
         assertions,
         projectRoot,
         instructionAssets,
+        selectedConfiguration,
       )
-    : { ...runtime, assertions, instructionAssets };
+    : { ...runtime, assertions, instructionAssets, configuration: selectedConfiguration };
 }
 
 export function executableForChoice(
   config: SkillbenchConfig,
   choice: RunnerChoice,
 ): string {
-  const definition = runnerDefinition(choice.runner);
-  return choice.runner === config.runner.type
-    ? config.runner.executable
-    : definition.defaultExecutable;
+  return executableConfiguration(config, choice).executable;
+}
+
+function executableConfiguration(
+  config: SkillbenchConfig,
+  choice: RunnerChoice,
+): ConfiguredRunner {
+  return selectionForChoice(config, choice).configuration;
 }
 
 function modelRuntime(
@@ -75,12 +88,14 @@ function modelRuntime(
   assertions: AssertionEngine,
   projectRoot: string,
   instructionAssets: ProjectRuntimeAssets,
+  configuration: ConfiguredRunner,
 ): ExecutionRuntime {
   const layout = createProjectLayout(projectRoot);
   return {
     runner,
     executionProfile,
     assertions,
+    configuration,
     judge: new BlindPairwiseJudge(
       new RunnerBackedJudge(runner, {
         timeoutMs: config.eval.timeoutMs,

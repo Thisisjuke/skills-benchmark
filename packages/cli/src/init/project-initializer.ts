@@ -150,10 +150,18 @@ export function initializeProject(
 
 function renderConfig(profile: RunnerChoice, outputsDirectory: string): string {
   const template = readDefault(join("config", `${profile.runner}.yaml`));
-  return template
+  const variant = "variant" in profile ? profile.variant : undefined;
+  const rendered = template
     .replace("{{outputsDirectory}}", JSON.stringify(outputsDirectory))
-    .replace("{{model}}", JSON.stringify(profile.model))
     .replace("{{reasoningEffort}}", JSON.stringify(profile.reasoningEffort));
+  const withModel =
+    profile.model === undefined
+      ? rendered.replace("    model: {{model}}\n", "")
+      : rendered.replace("{{model}}", JSON.stringify(profile.model));
+  const withVariant = variant === undefined
+    ? withModel.replace("    variant: {{variant}}\n", "")
+    : withModel.replace("{{variant}}", JSON.stringify(variant));
+  return `${withVariant.trimEnd()}\n`;
 }
 
 function readDefault(relativePath: string): string {

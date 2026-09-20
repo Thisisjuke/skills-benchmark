@@ -7,7 +7,7 @@ import type { ApplicationContext } from "../application";
 import { writeBundle } from "../bundles";
 import { createExecutionRuntime, type ExecutionRuntime } from "../composition/execution-runtime";
 import { createSourceService } from "../composition/source-service";
-import { loadConfig, type SkillbenchConfig } from "../config";
+import { loadConfig, type RunnerSelection, type SkillbenchConfig } from "../config";
 import { CliHistoryStore } from "../history";
 import { shouldRecommendInitialization } from "../init";
 import { configurePromptfooEnvironment, createProjectLayout } from "../project";
@@ -24,7 +24,6 @@ import {
   interactiveEnabled,
   PromptSession,
   type PromptPort,
-  type RunnerChoice,
 } from "./interactive";
 import { renderCliJsonResult, validatedResult, type CliJsonCommand } from "./json-output";
 import { CliJsonlWriter } from "./jsonl-output";
@@ -78,7 +77,7 @@ function loadConfiguredProject(
   logger.debug("config.load.complete", {
     configFile: loaded.configFile,
     projectRoot: loaded.projectRoot,
-    runner: loaded.config.runner.type,
+    runner: loaded.config.runners[0]?.type,
   });
   return {
     config: loaded.config,
@@ -124,10 +123,16 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     services.createHistoryStore(projectRoot, logger);
   const executionRuntimeFor = (
     config: SkillbenchConfig,
-    choice: RunnerChoice,
+    selection: RunnerSelection,
     projectRoot: string,
   ): Promise<ExecutionRuntime> =>
-    services.createExecutionRuntime(config, logger, choice, projectRoot);
+    services.createExecutionRuntime(
+      config,
+      logger,
+      selection.choice,
+      projectRoot,
+      selection.configuration,
+    );
   const sessionFor = (command: Command, json: boolean): PromptSession => {
     const global = getGlobalOptions(command);
     if (json && global.jsonl === true) {
@@ -177,10 +182,11 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       "runner reasoning effort: minimal, low, medium, high, xhigh or max",
       reasoningEffort,
     )
+    .option("--variant <variant>", "OpenCode provider-specific model variant", nonEmptyString)
     .option("--no-input", "disable all interactive questions")
     .option("--no-history", "disable the local comparison history")
     .option("--jsonl", "stream versioned machine-readable events")
-    .option("-y, --yes", "accept the configured runner and determined preflight");
+    .option("-y, --yes", "accept the determined preflight");
   program.configureHelp({ showGlobalOptions: true });
 
   program.action(async (_options, command: Command) => {

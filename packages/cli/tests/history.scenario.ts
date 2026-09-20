@@ -1,5 +1,12 @@
 // Registered by the CLI project lifecycle scenario suite.
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -53,5 +60,36 @@ describe("CliHistoryStore", () => {
     store.record(entry(cwd, 1));
     writeFileSync(store.path, "not-json\n");
     expect(store.list()).toEqual([]);
+  });
+
+  it("reads v1 history and writes OpenCode variants as v2", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-history-migration-"));
+    const store = new CliHistoryStore(cwd, undefined, () => new Date("2026-09-20T10:00:00Z"));
+    mkdirSync(dirname(store.path), { recursive: true });
+    writeFileSync(
+      store.path,
+      `${JSON.stringify({
+        schemaVersion: 1,
+        entries: [
+          {
+            id: "legacy",
+            createdAt: "2026-09-19T10:00:00.000Z",
+            ...entry(cwd, 1),
+          },
+        ],
+      })}\n`,
+    );
+    expect(store.list()).toMatchObject([{ id: "legacy", runner: "mock" }]);
+
+    store.record({
+      ...entry(cwd, 2),
+      runner: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      variant: "high",
+    });
+    expect(JSON.parse(readFileSync(store.path, "utf8"))).toMatchObject({
+      schemaVersion: 2,
+      entries: [{ runner: "opencode", variant: "high" }, { id: "legacy" }],
+    });
   });
 });

@@ -12,7 +12,7 @@ export function renderHistory(entries: readonly CliHistoryEntry[]): string {
 }
 
 export function historyHint(entry: CliHistoryEntry): string {
-  const profile = [entry.runner, entry.model, entry.reasoningEffort].filter(
+  const profile = [entry.runner, entry.model, entry.reasoningEffort, entry.variant].filter(
     (value): value is string => value !== undefined,
   );
   const timestamp = new Date(entry.createdAt).toISOString().slice(0, 16).replace("T", " ");

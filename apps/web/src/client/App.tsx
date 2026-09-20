@@ -209,7 +209,9 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
   const [holdout, setHoldout] = useState("");
   const [runner, setRunner] = useState<RunnerType>("mock");
   const [model, setModel] = useState("");
+  const [chooseOpenCodeModel, setChooseOpenCodeModel] = useState(false);
   const [reasoningEffort, setReasoningEffort] = useState<RunnerEffort>("low");
+  const [variant, setVariant] = useState("");
   const mutation = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       api<{ job: Job }>("/api/jobs", { method: "POST", body: JSON.stringify(body) }),
@@ -231,7 +233,13 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
       body.profile =
         runner === "mock"
           ? { runner }
-          : { runner, model: model.trim(), reasoningEffort };
+          : runner === "opencode"
+            ? {
+                runner,
+                ...(chooseOpenCodeModel ? { model: model.trim() } : {}),
+                ...(variant.trim() === "" ? {} : { variant: variant.trim() }),
+              }
+            : { runner, model: model.trim(), reasoningEffort };
     }
     mutation.mutate(body);
   };
@@ -288,9 +296,12 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
           onChange={(value) => {
             const selected = value as RunnerType;
             setRunner(selected);
-            const supported: readonly string[] =
-              selected === "codex" ? CODEX_EFFORTS : CLAUDE_EFFORTS;
-            if (selected !== "mock" && !supported.includes(reasoningEffort)) {
+            const supported: readonly string[] = selected === "codex" ? CODEX_EFFORTS : CLAUDE_EFFORTS;
+            if (
+              selected !== "mock" &&
+              selected !== "opencode" &&
+              !supported.includes(reasoningEffort)
+            ) {
               setReasoningEffort("low");
             }
           }}
@@ -298,24 +309,54 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
             ["mock", "Mock — chaîne de tooling"],
             ["codex", "Codex — évaluation réelle"],
             ["claude", "Claude — évaluation réelle"],
+            ["opencode", "OpenCode — configuration locale"],
           ]}
         />
         {runner !== "mock" && needsEvals ? (
           <>
-            <Field
-              label={`Modèle ${runner === "codex" ? "Codex" : "Claude"}`}
-              value={model}
-              onChange={setModel}
-              placeholder={runner === "codex" ? "gpt-5.6-luna" : "claude-sonnet-4-6"}
-            />
-            <SelectField
-              label="Effort de raisonnement"
-              value={reasoningEffort}
-              onChange={(value) => setReasoningEffort(value as RunnerEffort)}
-              options={(runner === "codex" ? CODEX_EFFORTS : CLAUDE_EFFORTS).map(
-                (effort) => [effort, effort] as [string, string],
-              )}
-            />
+            {runner === "opencode" ? (
+              <SelectField
+                label="Choisir explicitement le modèle OpenCode"
+                value={chooseOpenCodeModel ? "yes" : "no"}
+                onChange={(value) => setChooseOpenCodeModel(value === "yes")}
+                options={[
+                  ["yes", "Oui"],
+                  ["no", "Non — laisser OpenCode choisir"],
+                ]}
+              />
+            ) : null}
+            {runner !== "opencode" || chooseOpenCodeModel ? (
+              <Field
+                label={`Modèle ${runner === "codex" ? "Codex" : runner === "claude" ? "Claude" : "OpenCode"}`}
+                value={model}
+                onChange={setModel}
+                placeholder={
+                  runner === "codex"
+                    ? "gpt-5.6-luna"
+                    : runner === "claude"
+                      ? "claude-sonnet-4-6"
+                      : "provider/model"
+                }
+              />
+            ) : null}
+            {runner === "opencode" ? (
+              <Field
+                label="Variant OpenCode (optionnel)"
+                value={variant}
+                onChange={setVariant}
+                placeholder="high"
+                required={false}
+              />
+            ) : (
+              <SelectField
+                label="Effort de raisonnement"
+                value={reasoningEffort}
+                onChange={(value) => setReasoningEffort(value as RunnerEffort)}
+                options={(runner === "codex" ? CODEX_EFFORTS : CLAUDE_EFFORTS).map(
+                  (effort) => [effort, effort] as [string, string],
+                )}
+              />
+            )}
           </>
         ) : null}
       </div>

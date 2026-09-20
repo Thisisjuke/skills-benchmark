@@ -51,6 +51,17 @@ export function loadConfig(options: LoadConfigOptions = {}): LoadedConfig {
         cause: error,
       });
     }
+    if (
+      typeof input === "object" &&
+      input !== null &&
+      "runner" in input &&
+      !("runners" in input)
+    ) {
+      throw new SkillbenchError(
+        `Configuration ${configFile} uses the legacy runner field; migrate it manually to the runners list`,
+        { code: "CONFIG_MIGRATION_REQUIRED" },
+      );
+    }
   }
 
   try {

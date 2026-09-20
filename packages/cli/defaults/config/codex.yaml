@@ -1,9 +1,9 @@
-runner:
-  type: codex
-  executable: codex
-  model: {{model}}
-  reasoningEffort: {{reasoningEffort}}
-  sandbox: workspace-write
+runners:
+  - type: codex
+    executable: codex
+    model: {{model}}
+    reasoningEffort: {{reasoningEffort}}
+    sandbox: workspace-write
 
 eval:
   path: .skillbench/evals/development/default.yaml

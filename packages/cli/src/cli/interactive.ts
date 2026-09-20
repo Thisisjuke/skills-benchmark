@@ -12,7 +12,15 @@ import {
 } from "@clack/prompts";
 
 import { SkillbenchError } from "@skillbench/sdk/errors";
-import type { SkillbenchConfig } from "../config";
+import {
+  configuredRunnerForChoice,
+  formatConfiguredRunner,
+  selectionForChoice,
+  selectionForConfiguredRunner,
+  type ConfiguredRunner,
+  type RunnerSelection,
+  type SkillbenchConfig,
+} from "../config";
 import {
   runnerDefinition,
   runnerDefinitions,
@@ -24,12 +32,13 @@ import {
 import type { PreflightInput } from "../application";
 import { renderPreflight } from "./renderers";
 
-export type { RunnerChoice };
+export type { RunnerChoice, RunnerSelection };
 
 export type InteractiveFlags = {
   runner?: RunnerType;
   model?: string;
   reasoningEffort?: RunnerEffort;
+  variant?: string;
   input?: boolean;
   yes?: boolean;
 };
@@ -69,6 +78,12 @@ export type PromptSessionOptions = {
   onStatus?: (message: string, current?: number, total?: number) => void;
 };
 
+export type RunnerChoiceOptions = {
+  onRunnerAdded?: (runner: ConfiguredRunner) => void | Promise<void>;
+};
+
+const ADD_RUNNER = "__skillbench_add_runner__";
+
 export class PromptSession {
   private updateActiveProgress: ((message: string) => void) | undefined;
 
@@ -92,125 +107,147 @@ export class PromptSession {
     return answer;
   }
 
-  async runnerChoice(config: SkillbenchConfig, flags: InteractiveFlags): Promise<RunnerChoice> {
-    const hasProfileFlag = flags.model !== undefined || flags.reasoningEffort !== undefined;
+  async runnerChoice(
+    config: SkillbenchConfig,
+    flags: InteractiveFlags,
+    options: RunnerChoiceOptions = {},
+  ): Promise<RunnerSelection> {
+    const hasProfileFlag =
+      flags.model !== undefined ||
+      flags.reasoningEffort !== undefined ||
+      flags.variant !== undefined;
     const hasOverride = flags.runner !== undefined || hasProfileFlag;
-    const configuredChoice = configuredRunnerChoice(config);
-    if (!hasOverride && configuredChoice !== undefined) {
-      if (!this.options.interactive || this.options.yes) return configuredChoice;
-      const accepted = await this.options.prompts.confirm({
-        message: `Use configured runner?\n${configuredRunnerLabel(config, configuredChoice)}`,
+    if (!hasOverride) {
+      const defaultRunner = config.runners[0]!;
+      if (!this.options.interactive) return selectionForConfiguredRunner(defaultRunner);
+
+      const useDefault = await this.options.prompts.confirm({
+        message: `Use the default runner?\n${formatConfiguredRunner(defaultRunner)}`,
         initialValue: true,
       });
-      if (accepted) return configuredChoice;
+      if (useDefault) return selectionForConfiguredRunner(defaultRunner);
+
+      const selected = await this.options.prompts.select<string>({
+        message: "Which configured runner should be used?",
+        options: [
+          ...config.runners.map((runner, index) => ({
+            value: String(index),
+            label: formatConfiguredRunner(runner),
+          })),
+          { value: ADD_RUNNER, label: "Add a runner" },
+        ],
+        initialValue: "0",
+      });
+      if (selected !== ADD_RUNNER) {
+        return selectionForConfiguredRunner(config.runners[Number(selected)]!);
+      }
+
+      const choice = await this.configureRunner(
+        await this.chooseRunner("Which runner should be added?", defaultRunner.type),
+        {},
+        false,
+      );
+      const configuration = configuredRunnerForChoice(choice);
+      await options.onRunnerAdded?.(configuration);
+      return { choice, configuration };
     }
+
+    const defaultRunner = config.runners[0]!;
     const runner: RunnerType =
       flags.runner ??
       (hasProfileFlag
-        ? config.runner.type === "mock"
+        ? defaultRunner.type === "mock"
           ? "codex"
-          : config.runner.type
-        : this.options.interactive
-          ? await this.options.prompts.select<RunnerType>({
-              message: "Which runner should be used?",
-              options: runnerDefinitions.map((definition) => ({
-                value: runnerTypeSchema.parse(definition.id),
-                label: definition.label,
-                hint: definition.hint,
-              })),
-              initialValue: config.runner.type,
-            })
-          : config.runner.type);
-    const definition = runnerDefinition(runner);
-    const configuredProfileApplies = runner === config.runner.type;
-
-    if (definition.efforts.length === 0) {
-      return definition.createChoice(flags.model, flags.reasoningEffort);
-    }
-
-    const model =
-      flags.model ??
-      (this.options.interactive
-        ? await this.options.prompts.text({
-            message: `Which ${definition.name} model should be used?`,
-            ...(!configuredProfileApplies || config.runner.model === undefined
-              ? {}
-              : { initialValue: config.runner.model }),
-            ...(definition.modelPlaceholder === undefined
-              ? {}
-              : {
-                  placeholder: definition.modelPlaceholder,
-                  defaultValue: definition.modelPlaceholder,
-                }),
-          })
-        : configuredProfileApplies
-          ? config.runner.model
-          : undefined);
-
-    const reasoningEffort =
-      flags.reasoningEffort ??
-      (this.options.interactive
-        ? await this.options.prompts.select<RunnerEffort>({
-            message: "Which reasoning effort should be used?",
-            options: definition.efforts.map((value) => ({ value, label: value })),
-            initialValue:
-              configuredProfileApplies &&
-              config.runner.reasoningEffort !== undefined &&
-              definition.acceptsEffort(config.runner.reasoningEffort)
-                ? config.runner.reasoningEffort
-                : definition.efforts.includes("low")
-                  ? "low"
-                  : definition.efforts[0]!,
-          })
-        : configuredProfileApplies
-          ? config.runner.reasoningEffort
-          : undefined);
-    return definition.createChoice(model, reasoningEffort);
+          : defaultRunner.type
+        : defaultRunner.type);
+    return selectionForChoice(config, await this.configureRunner(runner, flags, false));
   }
 
   async initializationRunnerChoice(flags: InteractiveFlags): Promise<RunnerChoice> {
-    const runner: RunnerType =
+    const runner =
       flags.runner ??
       (this.options.interactive
-        ? await this.options.prompts.select<RunnerType>({
-            message: "Which runner should this project use by default?",
-            options: runnerDefinitions.map((definition) => ({
-              value: runnerTypeSchema.parse(definition.id),
-              label: definition.label,
-              hint: definition.hint,
-            })),
-            initialValue: "mock",
-          })
+        ? await this.chooseRunner("Which runner should this project use by default?", "mock")
         : "mock");
-    const definition = runnerDefinition(runner);
+    return this.configureRunner(runner, flags, true);
+  }
 
-    if (definition.efforts.length === 0) {
-      return definition.createChoice(flags.model, flags.reasoningEffort);
-    }
+  private async chooseRunner(message: string, initialValue: RunnerType): Promise<RunnerType> {
+    return this.options.prompts.select<RunnerType>({
+      message,
+      options: runnerDefinitions.map((definition) => ({
+        value: runnerTypeSchema.parse(definition.id),
+        label: definition.label,
+        hint: definition.hint,
+      })),
+      initialValue,
+    });
+  }
+
+  private async configureRunner(
+    runner: RunnerType,
+    flags: InteractiveFlags,
+    projectDefault: boolean,
+  ): Promise<RunnerChoice> {
+    const definition = runnerDefinition(runner);
 
     const model =
       flags.model ??
-      (this.options.interactive
-        ? await this.options.prompts.text({
-            message: `Which ${definition.name} model should be the project default?`,
-            ...(definition.modelPlaceholder === undefined
-              ? {}
-              : {
-                  placeholder: definition.modelPlaceholder,
-                  defaultValue: definition.modelPlaceholder,
-                }),
-          })
+      (definition.supportsModel && this.options.interactive
+        ? await this.enterModel(runner)
         : undefined);
     const reasoningEffort =
       flags.reasoningEffort ??
-      (this.options.interactive
+      (definition.efforts.length > 0 && this.options.interactive
         ? await this.options.prompts.select<RunnerEffort>({
-            message: "Which reasoning effort should be the project default?",
+            message: projectDefault
+              ? "Which reasoning effort should be the project default?"
+              : "Which reasoning effort should be used?",
             options: definition.efforts.map((value) => ({ value, label: value })),
             initialValue: definition.efforts.includes("low") ? "low" : definition.efforts[0]!,
           })
         : undefined);
-    return definition.createChoice(model, reasoningEffort);
+    const variant =
+      flags.variant ??
+      (definition.acceptsVariant && this.options.interactive
+        ? (await this.options.prompts.text({
+            message: projectDefault
+              ? "Which OpenCode variant should be the project default? (optional)"
+              : "Which OpenCode variant should be used? (optional)",
+          })).trim() || undefined
+        : undefined);
+    return definition.createChoice(model, reasoningEffort, variant);
+  }
+
+  private async enterModel(runner: RunnerType): Promise<string | undefined> {
+    const definition = runnerDefinition(runner);
+    if (!definition.supportsModel || runner === "mock") return undefined;
+
+    if (runner === "opencode") {
+      const chooseModel = await this.options.prompts.confirm({
+        message: "Choose an OpenCode model explicitly?",
+        initialValue: false,
+      });
+      if (!chooseModel) return undefined;
+    }
+
+    const model = (
+      await this.options.prompts.text({
+        message: `Enter a model identifier for ${definition.name}`,
+        ...(definition.modelPlaceholder === undefined
+          ? {}
+          : {
+              placeholder: definition.modelPlaceholder,
+              defaultValue: definition.modelPlaceholder,
+            }),
+      })
+    ).trim();
+    if (model === "") {
+      throw new SkillbenchError(`${definition.name} model cannot be empty`, {
+        code: "CLI_INPUT_REQUIRED",
+      });
+    }
+    return model;
   }
 
   async value(
@@ -330,28 +367,6 @@ export class PromptSession {
 
 function progressStatus(message: string, current?: number, total?: number): string {
   return current === undefined || total === undefined ? message : `[${current}/${total}] ${message}`;
-}
-
-function configuredRunnerChoice(config: SkillbenchConfig): RunnerChoice | undefined {
-  const definition = runnerDefinition(config.runner.type);
-  if (
-    definition.efforts.length > 0 &&
-    (config.runner.model === undefined || config.runner.reasoningEffort === undefined)
-  ) {
-    return undefined;
-  }
-  return definition.createChoice(config.runner.model, config.runner.reasoningEffort);
-}
-
-function configuredRunnerLabel(config: SkillbenchConfig, choice: RunnerChoice): string {
-  return [
-    runnerDefinition(choice.runner).name,
-    choice.model,
-    choice.reasoningEffort,
-    config.runner.sandbox,
-  ]
-    .filter((value): value is string => value !== undefined)
-    .join(" · ");
 }
 
 export function createClackPromptPort(input: Readable, output: Writable): PromptPort {

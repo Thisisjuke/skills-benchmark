@@ -21,7 +21,7 @@ describe("CodexExecutionProfile", () => {
 
   it("rejects missing choices and unsupported versions or efforts", () => {
     expect(() => createCodexExecutionProfile({ runnerVersion: "codex-cli 0.153.0" })).toThrow(
-      /runner\.model.*runner\.reasoningEffort/u,
+      /model.*reasoningEffort.*configured runner profile/u,
     );
     expect(
       codexExecutionProfileSchema.safeParse({

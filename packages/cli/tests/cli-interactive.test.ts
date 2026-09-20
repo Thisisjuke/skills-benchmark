@@ -77,12 +77,20 @@ function config() {
 
 function configuredCodex() {
   return skillbenchConfigSchema.parse({
-    runner: {
-      type: "codex",
-      model: "gpt-configured",
-      reasoningEffort: "medium",
-      sandbox: "workspace-write",
-    },
+    runners: [
+      {
+        type: "codex",
+        model: "gpt-configured",
+        reasoningEffort: "medium",
+        sandbox: "workspace-write",
+      },
+      {
+        type: "codex",
+        model: "gpt-fast",
+        reasoningEffort: "low",
+        sandbox: "read-only",
+      },
+    ],
   });
 }
 
@@ -149,7 +157,7 @@ describe("interactive CLI contracts", () => {
       reasoningEffort: "xhigh",
     });
 
-    expect(selected).toEqual({
+    expect(selected.choice).toEqual({
       runner: "codex",
       model: "gpt-from-flag",
       reasoningEffort: "xhigh",
@@ -157,55 +165,95 @@ describe("interactive CLI contracts", () => {
     expect(prompts.calls).toEqual([]);
   });
 
-  it("accepts a complete configured runner with one compact confirmation", async () => {
+  it("accepts the first configured runner as the default", async () => {
     const prompts = new ScriptedPrompts([true]);
     const session = new PromptSession({ interactive: true, yes: false, prompts });
 
-    await expect(session.runnerChoice(configuredCodex(), {})).resolves.toEqual({
+    const selected = await session.runnerChoice(configuredCodex(), {});
+    expect(selected.choice).toEqual({
       runner: "codex",
       model: "gpt-configured",
       reasoningEffort: "medium",
     });
     expect(prompts.calls).toEqual([
-      "confirm:Use configured runner?\nCodex · gpt-configured · medium · workspace-write",
+      "confirm:Use the default runner?\nCodex · gpt-configured · medium",
     ]);
   });
 
-  it("opens the detailed runner selection after declining the configured profile", async () => {
-    const configured = configuredCodex();
-    const before = structuredClone(configured);
-    const prompts = new ScriptedPrompts([false, "claude", "claude-sonnet-4-6", "max"]);
+  it("selects another configured runner without asking for its profile again", async () => {
+    const prompts = new ScriptedPrompts([false, "1"]);
     const session = new PromptSession({ interactive: true, yes: false, prompts });
 
-    await expect(session.runnerChoice(configured, {})).resolves.toEqual({
+    const selected = await session.runnerChoice(configuredCodex(), {});
+
+    expect(selected.choice).toEqual({
+      runner: "codex",
+      model: "gpt-fast",
+      reasoningEffort: "low",
+    });
+    expect(selected.configuration).toMatchObject({ sandbox: "read-only" });
+    expect(prompts.calls).toEqual([
+      "confirm:Use the default runner?\nCodex · gpt-configured · medium",
+      "select:Which configured runner should be used?",
+    ]);
+    expect(prompts.selections[0]?.options).toEqual([
+      { value: "0", label: "Codex · gpt-configured · medium" },
+      { value: "1", label: "Codex · gpt-fast · low" },
+      { value: "__skillbench_add_runner__", label: "Add a runner" },
+    ]);
+  });
+
+  it("configures and persists a newly added runner", async () => {
+    const configured = configuredCodex();
+    const before = structuredClone(configured);
+    const prompts = new ScriptedPrompts([
+      false,
+      "__skillbench_add_runner__",
+      "claude",
+      "claude-sonnet-4-6",
+      "max",
+    ]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+    const added: unknown[] = [];
+
+    const selected = await session.runnerChoice(configured, {}, {
+      onRunnerAdded: (runner) => {
+        added.push(runner);
+      },
+    });
+    expect(selected.choice).toEqual({
       runner: "claude",
       model: "claude-sonnet-4-6",
       reasoningEffort: "max",
     });
     expect(prompts.calls).toEqual([
-      "confirm:Use configured runner?\nCodex · gpt-configured · medium · workspace-write",
-      "select:Which runner should be used?",
-      "text:Which Claude model should be used?",
+      "confirm:Use the default runner?\nCodex · gpt-configured · medium",
+      "select:Which configured runner should be used?",
+      "select:Which runner should be added?",
+      "text:Enter a model identifier for Claude",
       "select:Which reasoning effort should be used?",
+    ]);
+    expect(added).toEqual([
+      expect.objectContaining({
+        type: "claude",
+        model: "claude-sonnet-4-6",
+        reasoningEffort: "max",
+      }),
     ]);
     expect(configured).toEqual(before);
   });
 
-  it("accepts the configured runner without prompting for --yes and no-input", async () => {
-    for (const options of [
-      { interactive: true, yes: true },
-      { interactive: false, yes: false },
-    ]) {
-      const prompts = new ScriptedPrompts([]);
-      const session = new PromptSession({ ...options, prompts });
+  it("accepts the configured runner without prompting in no-input mode", async () => {
+    const prompts = new ScriptedPrompts([]);
+    const session = new PromptSession({ interactive: false, yes: false, prompts });
 
-      await expect(session.runnerChoice(configuredCodex(), {})).resolves.toEqual({
-        runner: "codex",
-        model: "gpt-configured",
-        reasoningEffort: "medium",
-      });
-      expect(prompts.calls).toEqual([]);
-    }
+    const selected = await session.runnerChoice(configuredCodex(), {});
+    expect(selected.choice).toEqual({
+      runner: "codex",
+      model: "gpt-configured",
+      reasoningEffort: "medium",
+    });
+    expect(prompts.calls).toEqual([]);
   });
 
   it("initializes through inspect then reuses that runner for compare", async () => {
@@ -249,14 +297,11 @@ describe("interactive CLI contracts", () => {
       "1",
     ]);
 
-    expect(comparePrompts.calls).toContain(
-      "confirm:Use configured runner?\nMock · workspace-write",
-    );
-    expect(comparePrompts.calls).not.toContain("select:Which runner should be used?");
-    expect(comparePrompts.calls).not.toContain("text:Which Mock model should be used?");
+    expect(comparePrompts.calls).toContain("confirm:Use the default runner?\nMock");
+    expect(comparePrompts.calls).not.toContain("select:Which configured runner should be used?");
   });
 
-  it("does not persist a runner selected after declining the configured profile", async () => {
+  it("persists a newly configured runner from a command", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-runner-override-"));
     initializeProject(cwd, {
       profile: {
@@ -266,8 +311,12 @@ describe("interactive CLI contracts", () => {
       },
     });
     const configPath = join(cwd, ".skillbench", "config.yaml");
-    const before = readFileSync(configPath, "utf8");
-    const prompts = new ScriptedPrompts([false, "mock", true]);
+    const prompts = new ScriptedPrompts([
+      false,
+      "__skillbench_add_runner__",
+      "mock",
+      true,
+    ]);
 
     await createProgram({
       prompts,
@@ -287,8 +336,9 @@ describe("interactive CLI contracts", () => {
       "--no-output",
     ]);
 
-    expect(readFileSync(configPath, "utf8")).toBe(before);
-    expect(prompts.calls).toContain("select:Which runner should be used?");
+    expect(loadConfig({ cwd }).config.runners).toHaveLength(2);
+    expect(loadConfig({ cwd }).config.runners[1]).toMatchObject({ type: "mock" });
+    expect(readFileSync(configPath, "utf8")).toContain("- type: mock");
   });
 
   it("lists configured evaluation files instead of requesting an opaque path", async () => {
@@ -370,23 +420,32 @@ describe("interactive CLI contracts", () => {
       ]),
     ).rejects.toMatchObject({ code: "EVAL_VALIDATION_ERROR" });
 
-    expect(prompts.calls).toEqual(["confirm:Use configured runner?\nMock · workspace-write"]);
+    expect(prompts.calls).toEqual(["confirm:Use the default runner?\nMock"]);
   });
 
   it("collects sources and a Codex profile interactively", async () => {
-    const prompts = new ScriptedPrompts(["./local-skill", "codex", "gpt-cheap", "low"]);
+    const prompts = new ScriptedPrompts([
+      "./local-skill",
+      false,
+      "__skillbench_add_runner__",
+      "codex",
+      "gpt-cheap",
+      "low",
+    ]);
     const session = new PromptSession({ interactive: true, yes: false, prompts });
 
     expect(await session.requiredText(undefined, "skill", "Source ?")).toBe("./local-skill");
-    expect(await session.runnerChoice(config(), {})).toEqual({
+    expect((await session.runnerChoice(config(), {})).choice).toEqual({
       runner: "codex",
       model: "gpt-cheap",
       reasoningEffort: "low",
     });
     expect(prompts.calls).toEqual([
       "text:Source ?",
-      "select:Which runner should be used?",
-      "text:Which Codex model should be used?",
+      "confirm:Use the default runner?\nMock",
+      "select:Which configured runner should be used?",
+      "select:Which runner should be added?",
+      "text:Enter a model identifier for Codex",
       "select:Which reasoning effort should be used?",
     ]);
   });
@@ -424,23 +483,81 @@ describe("interactive CLI contracts", () => {
   });
 
   it("collects a Claude model and provider-supported effort interactively", async () => {
-    const prompts = new ScriptedPrompts(["claude", "claude-sonnet-4-6", "max"]);
+    const prompts = new ScriptedPrompts([
+      false,
+      "__skillbench_add_runner__",
+      "claude",
+      "claude-sonnet-4-6",
+      "max",
+    ]);
     const session = new PromptSession({ interactive: true, yes: false, prompts });
 
-    expect(await session.runnerChoice(config(), {})).toEqual({
+    expect((await session.runnerChoice(config(), {})).choice).toEqual({
       runner: "claude",
       model: "claude-sonnet-4-6",
       reasoningEffort: "max",
     });
     expect(prompts.calls).toEqual([
-      "select:Which runner should be used?",
-      "text:Which Claude model should be used?",
+      "confirm:Use the default runner?\nMock",
+      "select:Which configured runner should be used?",
+      "select:Which runner should be added?",
+      "text:Enter a model identifier for Claude",
       "select:Which reasoning effort should be used?",
     ]);
   });
 
+  it("collects an OpenCode provider/model and optional variant without an effort prompt", async () => {
+    const prompts = new ScriptedPrompts([
+      false,
+      "__skillbench_add_runner__",
+      "opencode",
+      true,
+      "anthropic/claude-sonnet-4-6",
+      "high",
+    ]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+
+    expect((await session.runnerChoice(config(), {})).choice).toEqual({
+      runner: "opencode",
+      model: "anthropic/claude-sonnet-4-6",
+      variant: "high",
+    });
+    expect(prompts.calls).toEqual([
+      "confirm:Use the default runner?\nMock",
+      "select:Which configured runner should be used?",
+      "select:Which runner should be added?",
+      "confirm:Choose an OpenCode model explicitly?",
+      "text:Enter a model identifier for OpenCode",
+      "text:Which OpenCode variant should be used? (optional)",
+    ]);
+  });
+
+  it("lets OpenCode resolve its model when explicit selection is declined", async () => {
+    const prompts = new ScriptedPrompts([
+      false,
+      "__skillbench_add_runner__",
+      "opencode",
+      false,
+      "",
+    ]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+
+    expect((await session.runnerChoice(config(), {})).choice).toEqual({ runner: "opencode" });
+    expect(prompts.calls).toEqual([
+      "confirm:Use the default runner?\nMock",
+      "select:Which configured runner should be used?",
+      "select:Which runner should be added?",
+      "confirm:Choose an OpenCode model explicitly?",
+      "text:Which OpenCode variant should be used? (optional)",
+    ]);
+  });
+
   it("accepts the recommended Codex model when init submits the model prompt empty", async () => {
-    const prompts = new ScriptedPrompts(["codex", "", "low"]);
+    const prompts = new ScriptedPrompts([
+      "codex",
+      "",
+      "low",
+    ]);
     const session = new PromptSession({ interactive: true, yes: false, prompts });
 
     await expect(session.initializationRunnerChoice({})).resolves.toEqual({
@@ -450,7 +567,7 @@ describe("interactive CLI contracts", () => {
     });
     expect(prompts.calls).toEqual([
       "select:Which runner should this project use by default?",
-      "text:Which Codex model should be the project default?",
+      "text:Enter a model identifier for Codex",
       "select:Which reasoning effort should be the project default?",
     ]);
   });
@@ -486,13 +603,12 @@ describe("interactive CLI contracts", () => {
     await expect(session.runnerChoice(config(), { runner: "claude" })).rejects.toMatchObject({
       code: "CLAUDE_PROFILE_REQUIRED",
     });
-    await expect(
-      session.runnerChoice(config(), {
-        runner: "claude",
-        model: "claude-sonnet-4-6",
-        reasoningEffort: "max",
-      }),
-    ).resolves.toEqual({
+    const selected = await session.runnerChoice(config(), {
+      runner: "claude",
+      model: "claude-sonnet-4-6",
+      reasoningEffort: "max",
+    });
+    expect(selected.choice).toEqual({
       runner: "claude",
       model: "claude-sonnet-4-6",
       reasoningEffort: "max",
@@ -610,7 +726,7 @@ describe("interactive CLI contracts", () => {
       writeStdout: (value) => output.push(value),
       services: {
         cwd: () => cwd,
-        createExecutionRuntime: async (_config, _logger, choice) => {
+        createExecutionRuntime: async (_config, _logger, choice, _root, configuration) => {
           choices.push(choice);
           return {
             executionProfile: {
@@ -641,6 +757,7 @@ describe("interactive CLI contracts", () => {
               }),
             },
             instructionAssets: loadProjectRuntimeAssets(cwd),
+            configuration: configuration!,
           };
         },
       },

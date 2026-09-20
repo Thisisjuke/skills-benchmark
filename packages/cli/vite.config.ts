@@ -29,6 +29,7 @@ export default defineConfig({
         "@skillbench/invocation-contract",
         "@skillbench/runner-claude",
         "@skillbench/runner-codex",
+        "@skillbench/runner-opencode",
         "@skillbench/sdk",
         "@skillbench/source-github",
       ],

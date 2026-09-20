@@ -209,6 +209,9 @@ importers:
       '@skillbench/runner-codex':
         specifier: workspace:*
         version: link:../runner-codex
+      '@skillbench/runner-opencode':
+        specifier: workspace:*
+        version: link:../runner-opencode
       '@skillbench/sdk':
         specifier: workspace:*
         version: link:../sdk
@@ -291,6 +294,31 @@ importers:
         specifier: 'catalog:'
         version: 10.0.1
     devDependencies:
+      publint:
+        specifier: 'catalog:'
+        version: 0.3.24
+
+  packages/runner-opencode:
+    dependencies:
+      '@skillbench/invocation-contract':
+        specifier: workspace:*
+        version: link:../invocation-contract
+      '@skillbench/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      execa:
+        specifier: 'catalog:'
+        version: 10.0.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.5.4
+    devDependencies:
+      '@skillbench/runner-kit':
+        specifier: workspace:*
+        version: link:../runner-kit
+      '@skillbench/test-contracts':
+        specifier: workspace:*
+        version: link:../test-contracts
       publint:
         specifier: 'catalog:'
         version: 0.3.24

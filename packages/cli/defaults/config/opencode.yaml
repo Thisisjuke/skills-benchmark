@@ -1,0 +1,21 @@
+runners:
+  - type: opencode
+    executable: opencode
+    model: {{model}}
+    variant: {{variant}}
+    sandbox: workspace-write
+
+eval:
+  path: .skillbench/evals/development/default.yaml
+  repeat: 1
+  timeoutMs: 180000
+
+promptfoo:
+  enabled: true
+
+reports:
+  markdown: true
+  template: .skillbench/reports/comparison.md
+
+outputs:
+  directory: {{outputsDirectory}}

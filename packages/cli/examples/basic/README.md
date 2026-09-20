@@ -3,7 +3,7 @@
 This example compares two local skills, generates three merge candidates, runs the
 development tournament, then opens the holdout only for the best parent and selected
 candidate. Its configuration explicitly selects `MockRunner` and exercises a
-Promptfoo output assertion: it uses no network, token, or Codex process.
+Promptfoo output assertion: it uses no network, token, or provider CLI process.
 
 From the monorepo root:
 

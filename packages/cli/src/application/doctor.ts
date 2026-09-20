@@ -1,4 +1,9 @@
 import { PROMPTFOO_VERSION } from "@skillbench/assertions-promptfoo";
+import { CLAUDE_VERSION_RANGE, isSupportedClaudeVersion } from "@skillbench/runner-claude";
+import {
+  isSupportedOpenCodeVersion,
+  OPENCODE_VERSION_RANGE,
+} from "@skillbench/runner-opencode";
 import { execa } from "execa";
 
 import { loadProjectRuntimeAssets } from "../assets";
@@ -62,26 +67,49 @@ export async function executeDoctor(request: DoctorRequest) {
 }
 
 async function inspectRunner(runner: string, executable: string) {
-  if (runner === "mock") return { runner, executable, available: true, version: "built-in" };
+  if (runner === "mock") {
+    return { runner, executable, available: true, supported: true, version: "built-in" };
+  }
   try {
     const probe = await execa(executable, ["--version"], { reject: false, timeout: 10_000 });
     const version = (probe.stdout || probe.stderr).trim();
+    const available = probe.exitCode === 0;
+    const support = available ? runnerSupport(runner, version) : undefined;
     return {
       runner,
       executable,
-      available: probe.exitCode === 0,
+      available,
+      supported: support?.supported ?? available,
       version: version || null,
-      ...(probe.exitCode === 0 ? {} : { remediation: `Install or configure ${runner}.` }),
+      ...(!available
+        ? { remediation: `Install or configure ${runner}.` }
+        : support?.supported === false
+          ? { remediation: `${runner} requires ${support.range}.` }
+          : {}),
     };
   } catch (error) {
     return {
       runner,
       executable,
       available: false,
+      supported: false,
       version: null,
       remediation: `Cannot execute ${executable}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
+}
+
+function runnerSupport(
+  runner: string,
+  version: string,
+): { supported: boolean; range: string } | undefined {
+  if (runner === "claude") {
+    return { supported: isSupportedClaudeVersion(version), range: CLAUDE_VERSION_RANGE };
+  }
+  if (runner === "opencode") {
+    return { supported: isSupportedOpenCodeVersion(version), range: OPENCODE_VERSION_RANGE };
+  }
+  return undefined;
 }
 
 function inspectAssets(root: string, initialized: boolean) {

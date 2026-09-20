@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-export const RUNNER_IDS = ["mock", "codex", "claude"] as const;
+export const RUNNER_IDS = ["mock", "codex", "claude", "opencode"] as const;
 export const CODEX_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export const RUNNER_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -21,6 +21,15 @@ export const automationRunnerProfileSchema = z.discriminatedUnion("runner", [
     runner: z.literal("claude"),
     model: z.string().trim().min(1),
     reasoningEffort: claudeEffortSchema,
+  }),
+  z.strictObject({
+    runner: z.literal("opencode"),
+    model: z
+      .string()
+      .trim()
+      .regex(/^[^/\s]+\/.+$/u, "OpenCode model must use provider/model format")
+      .optional(),
+    variant: z.string().trim().min(1).optional(),
   }),
 ]);
 

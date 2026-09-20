@@ -96,7 +96,11 @@ function renderExecutionProfileDetails(
     "reasoningEffort" in profile && typeof profile.reasoningEffort === "string"
       ? `- Reasoning effort: ${escapeText(profile.reasoningEffort)}\n`
       : "";
-  return `${model}${effort}`;
+  const variant =
+    "variant" in profile && typeof profile.variant === "string"
+      ? `- Variant: ${escapeText(profile.variant)}\n`
+      : "";
+  return `${model}${effort}${variant}`;
 }
 
 function sourceBlock(source: ComparisonReportPayloadV1["sourceA"]): string {

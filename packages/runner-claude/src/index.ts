@@ -1,4 +1,10 @@
-export { ClaudeRunner, type ClaudeRunnerOptions, type ClaudeSandbox } from "./claude-runner";
+export {
+  CLAUDE_VERSION_RANGE,
+  ClaudeRunner,
+  isSupportedClaudeVersion,
+  type ClaudeRunnerOptions,
+  type ClaudeSandbox,
+} from "./claude-runner";
 export {
   claudeEffortSchema,
   claudeExecutionProfileSchema,

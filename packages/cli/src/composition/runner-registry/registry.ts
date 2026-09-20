@@ -58,10 +58,13 @@ export function formatExecutionSelection(profile: ExecutionProfile): string {
       : typeof configuration.effort === "string"
         ? configuration.effort
         : undefined;
+  const variant =
+    typeof configuration.variant === "string" ? configuration.variant : undefined;
   return [
     definition?.name ?? profile.runner,
     model,
     effort === undefined ? undefined : `${effort} effort`,
+    variant === undefined ? undefined : `${variant} variant`,
   ]
     .filter((value): value is string => value !== undefined)
     .join(" · ");

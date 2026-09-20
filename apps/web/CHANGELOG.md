@@ -1,5 +1,32 @@
 # @thisisjuke/skillbench-web
 
+## 0.3.0
+
+### Minor Changes
+
+- Add OpenCode as a CLI and Web runner backed by the user's installed, authenticated, and
+  configured local OpenCode CLI. OpenCode profiles can specify `provider/model` or defer model
+  resolution to OpenCode, accept an optional `variant`, use a restrictive per-run agent, and
+  clean up their generated sessions.
+
+  Runner configuration now uses an ordered `runners` list of complete profiles. Interactive
+  commands offer the first profile by default, then let users select any saved profile or add
+  and persist another one, including multiple profiles for the same provider. OpenCode leaves
+  its model and reasoning effort unset by default and can therefore inherit its local CLI
+  configuration; choosing a model and variant remains optional.
+
+  This configuration change is not migrated automatically. Rename the former `runner`
+  mapping to a one-item `runners` list, move any additional choices into complete list entries,
+  and delete the former `models` section before running this version.
+
+  Keep Claude support with restricted non-interactive execution and require Claude Code
+  `>=2.1.259 <3.0.0`.
+
+### Patch Changes
+
+- Updated dependencies
+  - @thisisjuke/skillbench@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

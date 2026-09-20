@@ -2,6 +2,7 @@ import type { Command } from "commander";
 
 import { executeEval } from "../../application";
 import type { EvalPartition } from "@skillbench/sdk/evaluator";
+import { addConfiguredRunner } from "../../config";
 import type { ExecutionCommandContext } from "../command-context";
 import {
   getGlobalOptions,
@@ -50,13 +51,23 @@ export function registerEvalCommand(program: Command, context: ExecutionCommandC
       ) => {
         validateOutputOptions(options);
         const session = context.sessionFor(command, options.json === true);
-        const { config, layout, initializationChoice } = await ensureInitializedProject(
+        const { config, configFile, layout, initializationChoice } = await ensureInitializedProject(
           context,
           command,
           options.json === true,
         );
         const global = getGlobalOptions(command);
-        const runnerChoice = initializationChoice ?? (await session.runnerChoice(config, global));
+        const runnerChoice =
+          initializationChoice ??
+          (await session.runnerChoice(
+            config,
+            global,
+            configFile === undefined
+              ? {}
+              : {
+                  onRunnerAdded: (runner) => addConfiguredRunner(configFile, runner),
+                },
+          ));
         const source = await session.requiredText(
           input,
           "skill",

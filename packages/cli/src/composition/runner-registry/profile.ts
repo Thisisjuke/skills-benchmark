@@ -12,7 +12,7 @@ export function requiredModel(
 ): string {
   if (model === undefined || model.trim() === "") {
     throw new SkillbenchError(
-      `${provider} requires --model (or runner.model in .skillbench/config.yaml) in non-interactive mode`,
+      `${provider} requires --model (or a model in the selected runners entry in .skillbench/config.yaml) in non-interactive mode`,
       { code },
     );
   }
@@ -27,7 +27,7 @@ export function requiredEffort<Schema extends z.ZodType<RunnerEffort>>(
 ): z.output<Schema> {
   if (effort === undefined) {
     throw new SkillbenchError(
-      `${provider} requires --reasoning-effort (or runner.reasoningEffort in .skillbench/config.yaml) in non-interactive mode`,
+      `${provider} requires --reasoning-effort (or reasoningEffort in the selected runners entry in .skillbench/config.yaml) in non-interactive mode`,
       { code },
     );
   }

@@ -4,6 +4,12 @@ Skillbench helps you find out whether an Agent Skill is actually better—not ju
 different. It turns skills and evaluation suites into reproducible inputs, then lets
 you inspect, evaluate, compare, and merge them from a CLI or a local Web application.
 
+## Supported AI
+
+**Supported AI = Codex, Claude, and models available through OpenCode.** A built-in
+`mock` runner is also available to test the workflow without an AI or model charges.
+See [AI prerequisites](#ai-prerequisites) before choosing a model-backed runner.
+
 ## Why Skillbench exists
 
 Agent Skills are easy to edit and difficult to judge. A rewrite can sound clearer
@@ -14,12 +20,13 @@ Skillbench gives that work a repeatable loop:
 
 1. resolve local or GitHub-hosted skills to fingerprinted snapshots;
 2. run both skills against the same versioned evaluation suite;
-3. compare results with an explicit runner, model, and judging configuration;
+3. compare results with an explicit runner and judging configuration, plus an explicit
+   model when the selected runner requires one;
 4. generate merge candidates and optionally validate the winner on a holdout suite;
 5. keep each interactive run as a portable, human-readable result bundle for review.
 
 You can use the free deterministic mock runner to exercise the workflow, or connect an
-installed Codex or Claude executable for meaningful model-backed evaluations. The
+installed Codex, Claude, or OpenCode executable for meaningful model-backed evaluations. The
 Promptfoo assertion engine is included; it does not need to be installed separately.
 
 ## What's in this repository?
@@ -38,6 +45,24 @@ behind private workspace boundaries.
 
 Only the CLI and Web application are published. The private `@skillbench/*` packages
 are architectural boundaries, not packages users install separately.
+
+## AI prerequisites
+
+All runners require Node.js 22.22.2 or newer. Model-backed runners use an existing
+local CLI installation; Skillbench does not install it, sign you in, or supply model
+access.
+
+| Runner | What you need before running Skillbench |
+| --- | --- |
+| `mock` | Nothing else. It is deterministic and useful for workflow checks, not quality rankings. |
+| `codex` | `codex` on `PATH`, signed in, plus an explicit model and reasoning effort. No fixed CLI version range is enforced; use `skillbench doctor` to check availability. |
+| `claude` | `claude` on `PATH`, authenticated, version `>=2.1.259 <3.0.0`, plus an explicit model and effort. |
+| `opencode` | `opencode` on `PATH`, version `>=1.18.12 <2.0.0`, with at least one provider configured and authenticated. An explicit `provider/model` is optional: without one, OpenCode resolves the model from its own configuration. Variants are optional. |
+
+The CLI and Web product support the same runners. For Web, the executable and its
+credentials must be available to the process that starts `skillbench-web`. See the
+[CLI runner guide](packages/cli/README.md#choose-a-runner-and-control-cost) for the
+security and reproducibility differences between providers.
 
 ## Try Skillbench
 
@@ -71,7 +96,7 @@ npx @thisisjuke/skillbench compare \
 
 `init --no-input` selects the free mock runner, so this is a workflow smoke test rather
 than a meaningful quality ranking. For real evaluations, run interactive `init` and
-choose an installed, authenticated Codex or Claude runner.
+choose an installed, authenticated Codex, Claude, or OpenCode runner.
 
 The current directory becomes the Skillbench project. Versionable configuration,
 evaluation suites, and model-facing instructions live under `.skillbench/`; only
@@ -108,7 +133,7 @@ understand or change:
 | Change CLI commands, prompts, or terminal output | [`packages/cli/src/cli/`](packages/cli/src/cli/) |
 | Change CLI use cases or orchestration | [`packages/cli/src/application/`](packages/cli/src/application/) |
 | Change provider-independent evaluation behavior | [`packages/sdk/src/`](packages/sdk/src/) |
-| Add or modify a runner | [`packages/runner-kit/`](packages/runner-kit/), [`packages/runner-codex/`](packages/runner-codex/), or [`packages/runner-claude/`](packages/runner-claude/) |
+| Add or modify a runner | [`packages/runner-kit/`](packages/runner-kit/), [`packages/runner-codex/`](packages/runner-codex/), [`packages/runner-claude/`](packages/runner-claude/), or [`packages/runner-opencode/`](packages/runner-opencode/) |
 | Change GitHub source resolution | [`packages/source-github/`](packages/source-github/) |
 | Change Promptfoo assertions | [`packages/assertions-promptfoo/`](packages/assertions-promptfoo/) |
 | Change Web routes, jobs, UI, or storage | [`apps/web/src/`](apps/web/src/) |
@@ -157,7 +182,7 @@ Common commands:
 | Run the complete repository gate | `vp run check` |
 | Pack and exercise both products externally | `vp run smoke:release` |
 
-Real Codex, Claude, and GitHub tests are opt-in because they require an authenticated
+Real Codex, Claude, OpenCode, and GitHub tests are opt-in because they require an authenticated
 executable, network access, or tokens. Each adapter README owns its exact live-test
 command. Ordinary `test` and `check` tasks exclude those live files.
 

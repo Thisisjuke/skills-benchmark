@@ -11,7 +11,7 @@ user-facing API.
   version mechanics, and permission-to-sandbox mapping.
 - **Does not own:** provider argv, protocols, models, business use cases, terminal UX, or storage.
 - **Internal dependency:** SDK runner contracts.
-- **Direct dependents:** Codex and Claude runners.
+- **Direct dependents:** Codex, Claude, and OpenCode runners.
 - **Extension point:** add mechanics only after at least two runners require identical semantics.
 
 ## What the package provides
@@ -79,5 +79,5 @@ vp -C packages/runner-kit run typecheck
 vp -C packages/runner-kit run build
 ```
 
-After a public change, also run the tests for `@skillbench/runner-codex` and
-`@skillbench/runner-claude`, its two consumers.
+After a public change, also run the tests for `@skillbench/runner-codex`,
+`@skillbench/runner-claude`, and `@skillbench/runner-opencode`, its consumers.

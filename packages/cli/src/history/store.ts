@@ -10,10 +10,10 @@ import {
 } from "../composition/runner-registry";
 import { silentLogger, type Logger } from "@skillbench/sdk/logging";
 
-export const CLI_HISTORY_VERSION = 1 as const;
+export const CLI_HISTORY_VERSION = 2 as const;
 export const CLI_HISTORY_LIMIT = 10;
 
-const entrySchema = z.strictObject({
+const entrySchemaV1 = z.strictObject({
   id: z.string().min(1),
   createdAt: z.string().datetime({ offset: true }),
   cwd: z.string().min(1),
@@ -30,9 +30,16 @@ const entrySchema = z.strictObject({
   reasoningEffort: runnerEffortSchema.optional(),
 });
 
+const entrySchema = entrySchemaV1.extend({ variant: z.string().min(1).optional() });
+
 const documentSchema = z.strictObject({
   schemaVersion: z.literal(CLI_HISTORY_VERSION),
   entries: z.array(entrySchema).max(CLI_HISTORY_LIMIT),
+});
+
+const documentSchemaV1 = z.strictObject({
+  schemaVersion: z.literal(1),
+  entries: z.array(entrySchemaV1).max(CLI_HISTORY_LIMIT),
 });
 
 export type CliHistoryEntry = z.infer<typeof entrySchema>;
@@ -55,7 +62,10 @@ export class CliHistoryStore {
   list(): CliHistoryEntry[] {
     if (!existsSync(this.path)) return [];
     try {
-      return documentSchema.parse(JSON.parse(readFileSync(this.path, "utf8"))).entries;
+      const value: unknown = JSON.parse(readFileSync(this.path, "utf8"));
+      const current = documentSchema.safeParse(value);
+      if (current.success) return current.data.entries;
+      return documentSchemaV1.parse(value).entries;
     } catch (error) {
       this.logger.debug("cli.history.invalid", { path: this.path, error });
       return [];
@@ -109,5 +119,6 @@ function normalizedKey(entry: NewCliHistoryEntry | CliHistoryEntry): string {
     runner: entry.runner,
     model: entry.model,
     reasoningEffort: entry.reasoningEffort,
+    variant: entry.variant,
   });
 }

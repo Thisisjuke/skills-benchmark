@@ -15,14 +15,15 @@ export function registerDoctorCommand(program: Command, context: ExecutionComman
       const global = getGlobalOptions(command);
       validateOutputMode(options.json === true, global.jsonl === true);
       const project = context.loadProject(command);
+      const defaultRunner = project.config.runners[0];
       const runner =
         global.runner ??
-        (project.configFile === undefined ? undefined : project.config.runner.type);
+        (project.configFile === undefined ? undefined : defaultRunner?.type);
       const executable =
         runner === undefined
           ? undefined
-          : runner === project.config.runner.type
-            ? project.config.runner.executable
+          : runner === defaultRunner?.type
+            ? defaultRunner.executable
             : runnerDefinition(runner).defaultExecutable;
       const result = await executeDoctor({
         projectRoot: project.layout.root,
