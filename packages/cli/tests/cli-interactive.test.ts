@@ -62,9 +62,12 @@ class ScriptedPrompts implements PromptPort {
     this.calls.push(`note:${title ?? ""}`);
   }
 
-  async progress<Value>(message: string, task: () => Promise<Value>): Promise<Value> {
+  async progress<Value>(
+    message: string,
+    task: (update: (message: string) => void) => Promise<Value>,
+  ): Promise<Value> {
     this.calls.push(`progress:${message}`);
-    return task();
+    return task((nextMessage) => this.calls.push(`status:${nextMessage}`));
   }
 }
 
@@ -99,7 +102,13 @@ async function mockPreflight() {
 describe("interactive CLI contracts", () => {
   it("initializes an incomplete project and resumes the requested comparison", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-interactive-resume-"));
-    const prompts = new ScriptedPrompts(["mock", ".skillbench/runs", true, true]);
+    const prompts = new ScriptedPrompts([
+      "mock",
+      ".skillbench/runs",
+      true,
+      ".skillbench/reports/comparison.md",
+      true,
+    ]);
     const output: string[] = [];
 
     await createProgram({
@@ -217,7 +226,11 @@ describe("interactive CLI contracts", () => {
     ]);
 
     const evals = resolve("tests/fixtures/evals/development");
-    const comparePrompts = new ScriptedPrompts([true, true]);
+    const comparePrompts = new ScriptedPrompts([
+      true,
+      ".skillbench/reports/comparison.md",
+      true,
+    ]);
     await createProgram({
       prompts: comparePrompts,
       stdinIsTTY: true,
@@ -278,11 +291,14 @@ describe("interactive CLI contracts", () => {
     expect(prompts.calls).toContain("select:Which runner should be used?");
   });
 
-  it("explains what an eval suite contains when requesting its path", async () => {
+  it("lists configured evaluation files instead of requesting an opaque path", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-eval-prompt-"));
     initializeProject(cwd);
-    const evals = resolve("tests/fixtures/evals/development");
-    const prompts = new ScriptedPrompts([true, evals, true]);
+    const prompts = new ScriptedPrompts([
+      true,
+      ".skillbench/evals/development/default.yaml",
+      true,
+    ]);
 
     await createProgram({
       prompts,
@@ -300,9 +316,61 @@ describe("interactive CLI contracts", () => {
       "--no-output",
     ]);
 
+    expect(prompts.calls).toContain("select:Which development evaluation should be used?");
+    expect(prompts.selections.at(-1)).toMatchObject({
+      initialValue: ".skillbench/evals/development/default.yaml",
+      options: [
+        expect.objectContaining({
+          label: "Create a release checklist",
+          value: ".skillbench/evals/development/default.yaml",
+        }),
+      ],
+    });
     expect(prompts.calls).toContain(
-      "text:Which eval YAML file or directory defines the tasks and assertions used to score this skill?",
+      "status:[1/1] Sending basic-skill, “Create a release checklist”, iteration 1 to Mock…",
     );
+    expect(prompts.calls).toContain(
+      "status:[1/1] Checking results for basic-skill, “Create a release checklist”, iteration 1…",
+    );
+  });
+
+  it("validates a selected eval before asking for later compare inputs", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-invalid-eval-prompt-"));
+    initializeProject(cwd);
+    const invalidEval = join(cwd, ".skillbench", "evals", "development", "invalid.yaml");
+    writeFileSync(
+      invalidEval,
+      [
+        "id: invalid-rubric",
+        "name: Invalid rubric",
+        "partition: development",
+        "prompt: Test the invalid rubric.",
+        "assertions:",
+        "  - type: llm-rubric",
+        "    value: This key is not supported.",
+        "",
+      ].join("\n"),
+    );
+    const prompts = new ScriptedPrompts([true]);
+
+    await expect(
+      createProgram({
+        prompts,
+        stdinIsTTY: true,
+        stderrIsTTY: true,
+        services: { cwd: () => cwd },
+      }).parseAsync([
+        "node",
+        "skillbench",
+        "compare",
+        resolve("tests/fixtures/skills/basic"),
+        resolve("tests/fixtures/skills/basic"),
+        "--evals",
+        invalidEval,
+      ]),
+    ).rejects.toMatchObject({ code: "EVAL_VALIDATION_ERROR" });
+
+    expect(prompts.calls).toEqual(["confirm:Use configured runner?\nMock · workspace-write"]);
   });
 
   it("collects sources and a Codex profile interactively", async () => {
@@ -320,6 +388,38 @@ describe("interactive CLI contracts", () => {
       "select:Which runner should be used?",
       "text:Which Codex model should be used?",
       "select:Which reasoning effort should be used?",
+    ]);
+  });
+
+  it("trims supplied text inputs and streams progress updates", async () => {
+    const prompts = new ScriptedPrompts([]);
+    const statuses: string[] = [];
+    const session = new PromptSession({
+      interactive: true,
+      yes: false,
+      prompts,
+      onStatus: (message, current, total) => statuses.push(`${current}/${total}:${message}`),
+    });
+
+    await expect(session.requiredText("  ./local-skill  ", "skill", "Source ?")).resolves.toBe(
+      "./local-skill",
+    );
+    await expect(session.value("  evals/default.yaml  ", "Evals ?", "fallback")).resolves.toBe(
+      "evals/default.yaml",
+    );
+    await session.progress("Comparing skills", async () => {
+      session.status("Sending iteration to Codex…", 1, 2);
+      session.status("Checking iteration results…", 1, 2);
+    });
+
+    expect(prompts.calls).toEqual([
+      "progress:Comparing skills",
+      "status:[1/2] Sending iteration to Codex…",
+      "status:[1/2] Checking iteration results…",
+    ]);
+    expect(statuses).toEqual([
+      "1/2:Sending iteration to Codex…",
+      "1/2:Checking iteration results…",
     ]);
   });
 
@@ -433,6 +533,15 @@ describe("interactive CLI contracts", () => {
         prompts: new ScriptedPrompts([]),
       }).chooseSkill(["skills/a/SKILL.md", "skills/b/SKILL.md"]),
     ).rejects.toMatchObject({ code: "GITHUB_SKILL_SELECTION_REQUIRED" });
+  });
+
+  it("renders prominent notices through the terminal prompt composition", () => {
+    const prompts = new ScriptedPrompts([]);
+    const session = new PromptSession({ interactive: true, yes: false, prompts });
+
+    session.notice("The sources address different task categories.", "Merge skipped");
+
+    expect(prompts.calls).toEqual(["note:Merge skipped"]);
   });
 
   it("opens a command selector when the root command runs in a TTY", async () => {
@@ -578,7 +687,11 @@ describe("interactive CLI contracts", () => {
       "id: history\nname: history\npartition: development\nprompt: test\nassertions:\n  - type: exit-code\n    value: 0\n",
     );
     initializeProject(cwd);
-    const prompts = new ScriptedPrompts([true, true]);
+    const prompts = new ScriptedPrompts([
+      true,
+      ".skillbench/reports/comparison.md",
+      true,
+    ]);
     await createProgram({
       prompts,
       stdinIsTTY: true,

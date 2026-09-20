@@ -16,6 +16,7 @@ import type { WrittenBundle } from "../bundles";
 import type { RunnerChoice } from "../composition/runner-registry";
 import type { SkillbenchConfig } from "../config";
 import { effectiveRunConfig } from "./effective-config";
+import { evaluationRunCount, runnerWithProgress } from "./progress";
 
 export type EvalRequest = OutputRequest & {
   config: SkillbenchConfig;
@@ -58,13 +59,24 @@ export async function executeEval(
     runnerChoice,
     request.projectRoot,
   );
-  const evaluator = new EvaluationService(runtime.runner, runtime.assertions, {
-    logger: context.logger,
-    id: context.createId,
-    now: context.now,
-    workspaceParent: resolve(request.projectRoot, ".skillbench", "tmp"),
-  });
   const repeat = request.repeat ?? request.config.eval.repeat;
+  const evaluator = new EvaluationService(
+    runnerWithProgress({
+      runner: runtime.runner,
+      events: request.events,
+      executionProfile: runtime.executionProfile,
+      suite,
+      totalRuns: evaluationRunCount(suite, repeat),
+      snapshotLabels: new Map([[resolvedSkill.snapshot.id, resolvedSkill.skill.name]]),
+    }),
+    runtime.assertions,
+    {
+      logger: context.logger,
+      id: context.createId,
+      now: context.now,
+      workspaceParent: resolve(request.projectRoot, ".skillbench", "tmp"),
+    },
+  );
   await request.events.confirmPreflight(
     {
       operation: "eval",

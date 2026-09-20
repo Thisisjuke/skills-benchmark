@@ -45,6 +45,7 @@ export type WriteBundleInput = {
   recommendedSkill?: MergeCandidate;
   finalSkill?: MergeCandidate;
   instructionAssets?: readonly ProjectAsset[];
+  reportTemplates?: readonly ProjectAsset[];
   force?: boolean;
 };
 
@@ -76,6 +77,7 @@ export function writeBundle(input: WriteBundleInput): WrittenBundle {
     const reports = [
       writePrimaryReport(staging, input.reportMarkdown),
       ...(input.reports ?? []).map((report) => writeReport(staging, report)),
+      ...(input.reportTemplates ?? []).map((asset) => writeReportTemplate(staging, asset)),
     ];
     const artifacts = [
       ...(input.candidates ?? []).flatMap((candidate) =>
@@ -117,6 +119,16 @@ export function writeBundle(input: WriteBundleInput): WrittenBundle {
     rmSync(staging, { recursive: true, force: true });
     throw error;
   }
+}
+
+function writeReportTemplate(staging: string, asset: ProjectAsset): BundleReportReference {
+  const path = `reports/templates/${basename(asset.path)}`;
+  writeFile(staging, path, asset.content);
+  return {
+    ...fileReference(path, asset.content),
+    id: asset.id,
+    mediaType: "text/markdown",
+  };
 }
 
 function writeInstruction(staging: string, asset: ProjectAsset): BundleInstructionReference {

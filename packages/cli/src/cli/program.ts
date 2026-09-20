@@ -32,6 +32,7 @@ import { writeStdout as writeProcessStdout } from "./stdio";
 import {
   getGlobalOptions,
   globalArguments,
+  nonEmptyString,
   reasoningEffort,
   runnerType,
   type GlobalOptions,
@@ -147,6 +148,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
         ? {
             onProgress: (message: string) =>
               jsonlWriter(command.name() as CliJsonCommand).phase(message),
+            onStatus: (message: string, current?: number, total?: number) =>
+              jsonlWriter(command.name() as CliJsonCommand).progress(message, current, total),
           }
         : {}),
     });
@@ -163,11 +166,12 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .option(
       "-c, --config <path>",
       "configuration file (canonical project path: .skillbench/config.yaml)",
+      nonEmptyString,
     )
     .option("--debug", "write diagnostic events and stacktraces to stderr")
     .option("--offline", "forbid network access and reject remote GitHub sources")
     .option("--runner <runner>", "registered execution runner identifier", runnerType)
-    .option("--model <model>", "runner model identifier")
+    .option("--model <model>", "runner model identifier", nonEmptyString)
     .option(
       "--reasoning-effort <effort>",
       "runner reasoning effort: minimal, low, medium, high, xhigh or max",
@@ -268,7 +272,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
 
   program.addHelpText(
     "after",
-    `\nExamples:\n  $ skillbench init\n  $ skillbench inspect ./skills/my-skill\n  $ skillbench eval ./skills/my-skill --evals .skillbench/evals/development\n  $ skillbench compare ./skill-a https://github.com/owner/repository/tree/main/skill-b --evals .skillbench/evals/development\n  $ skillbench merge ./skill-a ./skill-b --evals .skillbench/evals/development\n  $ skillbench history\n  $ skillbench doctor\n  $ skillbench inspect github:owner/repository/path/to/skill@main --json\n`,
+    `\nExamples:\n  $ skillbench init\n  $ skillbench inspect ./skills/my-skill\n  $ skillbench eval ./skills/my-skill\n  $ skillbench compare ./skill-a https://github.com/owner/repository/tree/main/skill-b\n  $ skillbench merge ./skill-a ./skill-b\n  $ skillbench history\n  $ skillbench doctor\n  $ skillbench inspect github:owner/repository/path/to/skill@main --json\n`,
   );
   return program;
 }

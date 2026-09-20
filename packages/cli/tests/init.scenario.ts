@@ -15,17 +15,23 @@ describe("initializeProject", () => {
     expect(shouldRecommendInitialization(cwd)).toBe(true);
     const result = initializeProject(cwd);
 
-    expect(result.created).toHaveLength(7);
+    expect(result.created).toHaveLength(8);
     const config = readFileSync(join(cwd, ".skillbench", "config.yaml"), "utf8");
     expect(config).not.toContain("storage:");
     expect(config).toContain('directory: ".skillbench/runs"');
-    const example = readFileSync(
-      join(cwd, ".skillbench", "evals", "development", "example.yaml"),
+    const active = readFileSync(
+      join(cwd, ".skillbench", "evals", "development", "default.yaml"),
       "utf8",
     );
-    expect(example).toContain("Each YAML file is one task used to score a skill");
-    expect(example).toContain("RELEASE_CHECKLIST.md");
-    expect(example).toContain("Assertions turn observable results into a score");
+    const example = readFileSync(
+      join(cwd, ".skillbench", "evals", "examples", "example.yaml"),
+      "utf8",
+    );
+    expect(active).toContain("Create a release checklist");
+    expect(active).toContain("RELEASE_CHECKLIST.md");
+    expect(example).toContain("Reference only");
+    expect(example).toContain("Prepare a release plan and risk register");
+    expect(example).toContain("risk-register.json");
     expect(loadEvalSuite(join(cwd, ".skillbench", "evals", "development"))).toMatchObject({
       partition: "development",
       cases: [
@@ -33,11 +39,38 @@ describe("initializeProject", () => {
           id: "create-release-checklist",
           assertions: expect.arrayContaining([
             { type: "file-exists", value: "RELEASE_CHECKLIST.md" },
+            {
+              type: "contains",
+              path: "RELEASE_CHECKLIST.md",
+              value: "# Release checklist",
+            },
+            {
+              type: "llm-rubric",
+              rubric: "The checklist is concise, actionable, and easy to scan.",
+            },
+          ]),
+        },
+      ],
+    });
+    expect(
+      loadEvalSuite(join(cwd, ".skillbench", "evals", "examples", "example.yaml"), {
+        partition: "development",
+      }),
+    ).toMatchObject({
+      cases: [
+        {
+          id: "prepare-release-plan",
+          assertions: expect.arrayContaining([
+            {
+              type: "llm-rubric",
+              rubric: expect.stringContaining("rollback readiness"),
+            },
           ]),
         },
       ],
     });
     expect(existsSync(join(cwd, ".skillbench", "assets.yaml"))).toBe(true);
+    expect(existsSync(join(cwd, ".skillbench", "reports", "comparison.md"))).toBe(true);
     const gitignore = readFileSync(join(cwd, ".gitignore"), "utf8");
     expect(gitignore).toContain(".skillbench/runs/");
     expect(gitignore).not.toContain(".skillbench/\n");

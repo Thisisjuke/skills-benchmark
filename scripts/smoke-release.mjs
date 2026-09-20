@@ -3,11 +3,14 @@ import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
 const workspaceRoot = resolve(import.meta.dirname, "..");
@@ -83,7 +86,37 @@ function pack(product, inspection) {
   if (!existsSync(tarballPath) || statSync(tarballPath).size === 0) {
     throw new Error(`Expected tarball was not created: ${tarballPath}`);
   }
+  sanitizePackedManifest(tarballPath);
   return tarballPath;
+}
+
+function sanitizePackedManifest(tarballPath) {
+  const staging = mkdtempSync(join(tmpdir(), "skillbench-pack-"));
+  try {
+    run("tar", ["-xzf", tarballPath, "-C", staging]);
+    const manifestPath = join(staging, "package", "package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    delete manifest.devDependencies;
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    run("tar", ["-czf", tarballPath, "-C", staging, "package"]);
+    const publishedManifest = JSON.parse(
+      run("tar", ["-xOzf", tarballPath, "package/package.json"], { capture: true }),
+    );
+    const dependencyNames = Object.keys({
+      ...publishedManifest.dependencies,
+      ...publishedManifest.devDependencies,
+      ...publishedManifest.optionalDependencies,
+      ...publishedManifest.peerDependencies,
+    });
+    const privateDependencies = dependencyNames.filter((name) => name.startsWith("@skillbench/"));
+    if (privateDependencies.length > 0) {
+      throw new Error(
+        `${publishedManifest.name} exposes private workspaces: ${privateDependencies.join(", ")}`,
+      );
+    }
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
 }
 
 function findPublishableWorkspacePackages() {

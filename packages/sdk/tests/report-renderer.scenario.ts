@@ -7,6 +7,7 @@ import type { ComparisonSummary } from "@skillbench/sdk/comparator";
 import type { EvaluationSummary } from "@skillbench/sdk/evaluator";
 import type { InspectResult } from "@skillbench/sdk/inspect";
 import {
+  createComparisonTemplateRenderer,
   renderComparisonReport,
   renderEvaluationBundleReport,
   renderInspectBundleReport,
@@ -97,6 +98,19 @@ describe("renderComparisonReport", () => {
     expect(createHash("sha256").update(markdown).digest("hex")).toBe(
       "b34f53c9aaef977bce6b905cd0ace227b9ad864da3d702700f53dbcf4f09a2fd",
     );
+
+    const template = [
+      "# {{sourceA.name}} vs {{sourceB.name}}",
+      "{{#dimensions}}- {{label}}: {{scoreA}} / {{scoreB}} ({{winner}}){{/dimensions}}",
+      "{{^judgments}}No qualitative judgment.{{/judgments}}",
+    ].join("\n");
+    const renderer = createComparisonTemplateRenderer(template, "a".repeat(64));
+    expect(renderer.version).toBe("comparison-template-v1:aaaaaaaaaaaa");
+    expect(renderer.render(payload)).toContain("- Functional correctness: 80.0% / 70.0% (A)");
+    expect(renderer.render(payload)).toContain("No qualitative judgment.");
+    expect(() =>
+      createComparisonTemplateRenderer("{{missing}}", "b".repeat(64)).render(payload),
+    ).toThrow(/Unknown template variable/u);
   });
 });
 

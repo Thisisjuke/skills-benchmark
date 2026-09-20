@@ -23,20 +23,24 @@ export const INITIALIZED_PROJECT_FILES = Object.freeze([
     description: "Project runner, evaluation, and output settings.",
   },
   {
-    path: ".skillbench/evals/development/example.yaml",
-    description: "A starter development evaluation to replace or extend.",
+    path: ".skillbench/evals/development/default.yaml",
+    description: "The runnable starter development evaluation used by default.",
+  },
+  {
+    path: ".skillbench/evals/examples/example.yaml",
+    description: "A richer reference evaluation that is not run by default.",
   },
   {
     path: ".skillbench/assets.yaml",
     description: "The validated map of editable runtime instruction assets.",
   },
   {
-    path: ".skillbench/judge/SKILL.md",
+    path: ".skillbench/prompts/judge/SKILL.md",
     description: "The local skill used for qualitative blind judging.",
   },
   {
-    path: ".skillbench/prompts/judge-instruction.txt",
-    description: "The instruction sent to the qualitative judge runner.",
+    path: ".skillbench/reports/comparison.md",
+    description: "The editable Markdown template used by comparison reports.",
   },
   {
     path: ".skillbench/templates/merge-candidate.md",
@@ -50,14 +54,21 @@ export const INITIALIZED_PROJECT_FILES = Object.freeze([
 
 const PROJECT_TEMPLATES = [
   {
-    target: ".skillbench/evals/development/example.yaml",
-    source: "evals/development/example.yaml",
+    target: ".skillbench/evals/development/default.yaml",
+    source: "evals/development/default.yaml",
+  },
+  {
+    target: ".skillbench/evals/examples/example.yaml",
+    source: "evals/examples/example.yaml",
   },
   { target: ".skillbench/assets.yaml", source: "skillbench/assets.yaml" },
-  { target: ".skillbench/judge/SKILL.md", source: "skillbench/judge/SKILL.md" },
   {
-    target: ".skillbench/prompts/judge-instruction.txt",
-    source: "skillbench/prompts/judge-instruction.txt",
+    target: ".skillbench/prompts/judge/SKILL.md",
+    source: "skillbench/prompts/judge/SKILL.md",
+  },
+  {
+    target: ".skillbench/reports/comparison.md",
+    source: "skillbench/reports/comparison.md",
   },
   {
     target: ".skillbench/templates/merge-candidate.md",

@@ -8,8 +8,7 @@ const sourceRoots = readdirSync(resolve(workspaceRoot, "packages"), { withFileTy
   .map((entry) => resolve(workspaceRoot, "packages", entry.name, "src"))
   .filter(existsSync);
 const expectedAssets = [
-  "skillbench/judge/SKILL.md",
-  "skillbench/prompts/judge-instruction.txt",
+  "skillbench/prompts/judge/SKILL.md",
   "skillbench/templates/merge-candidate.md",
 ];
 const literalAssignment =

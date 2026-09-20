@@ -1,6 +1,10 @@
 import { ComparisonService, type ComparisonSummary } from "@skillbench/sdk/comparator";
 import { EvaluationService, loadEvalSuite, type EvalPartition } from "@skillbench/sdk/evaluator";
-import { ComparisonReportService, type StoredReport } from "@skillbench/sdk/reports";
+import {
+  ComparisonReportService,
+  createComparisonTemplateRenderer,
+  type StoredReport,
+} from "@skillbench/sdk/reports";
 import { createRunnerPermissions } from "@skillbench/sdk/runners";
 import type { ResolveOptions } from "@skillbench/sdk/sources";
 import type { InstructionAssetReference } from "@skillbench/sdk/results";
@@ -12,6 +16,13 @@ import type { WrittenBundle } from "../bundles";
 import { effectiveRunConfig } from "./effective-config";
 import type { RunnerChoice } from "../composition/runner-registry";
 import type { SkillbenchConfig } from "../config";
+import { loadProjectFileAsset } from "../assets";
+import {
+  evaluationRunCount,
+  judgeWithProgress,
+  qualitativeJudgmentCount,
+  runnerWithProgress,
+} from "./progress";
 
 export type CompareResult = ComparisonSummary & {
   sources: {
@@ -31,6 +42,7 @@ export type CompareRequest = OutputRequest & {
   resolveOptionsA: ResolveOptions;
   resolveOptionsB: ResolveOptions;
   evals: string;
+  reportTemplate?: string;
   partition?: EvalPartition;
   repeat?: number;
   keepWorkspaces?: boolean;
@@ -79,13 +91,36 @@ export async function executeCompare(
     request.projectRoot,
   );
   const instructionAssets = comparisonInstructionAssets(runtime, suite);
-  const evaluator = new EvaluationService(runtime.runner, runtime.assertions, {
-    logger: context.logger,
-    id: context.createId,
-    now: context.now,
-    workspaceParent: resolve(request.projectRoot, ".skillbench", "tmp"),
-  });
+  const reportTemplate = loadProjectFileAsset(
+    request.projectRoot,
+    "comparison-template",
+    request.reportTemplate ?? request.config.reports.template,
+  );
+  const reportRenderer = createComparisonTemplateRenderer(
+    reportTemplate.text,
+    reportTemplate.contentHash,
+  );
   const repeat = request.repeat ?? request.config.eval.repeat;
+  const evaluator = new EvaluationService(
+    runnerWithProgress({
+      runner: runtime.runner,
+      events: request.events,
+      executionProfile: runtime.executionProfile,
+      suite,
+      totalRuns: evaluationRunCount(suite, repeat, 2),
+      snapshotLabels: new Map([
+        [skillA.snapshot.id, `skill A (${skillA.skill.name})`],
+        [skillB.snapshot.id, `skill B (${skillB.skill.name})`],
+      ]),
+    }),
+    runtime.assertions,
+    {
+      logger: context.logger,
+      id: context.createId,
+      now: context.now,
+      workspaceParent: resolve(request.projectRoot, ".skillbench", "tmp"),
+    },
+  );
   const effectiveConfig = effectiveRunConfig(request.config, repeat, runtime.executionProfile);
   await request.events.confirmPreflight(
     {
@@ -106,7 +141,15 @@ export async function executeCompare(
   );
   const summary = await request.events.progress("Comparing skills", () =>
     new ComparisonService(evaluator, {
-      ...(runtime.judge === undefined ? {} : { judge: runtime.judge }),
+      ...(runtime.judge === undefined
+        ? {}
+        : {
+            judge: judgeWithProgress({
+              judge: runtime.judge,
+              events: request.events,
+              totalJudgments: qualitativeJudgmentCount(suite),
+            }),
+          }),
       logger: context.logger,
       id: context.createId,
       now: context.now,
@@ -126,7 +169,11 @@ export async function executeCompare(
     }),
   );
   const report = request.config.reports.markdown
-    ? new ComparisonReportService({ id: context.createId, now: context.now }).create(
+    ? new ComparisonReportService({
+        id: context.createId,
+        now: context.now,
+        renderer: reportRenderer,
+      }).create(
         summary,
         skillA,
         skillB,
@@ -135,7 +182,11 @@ export async function executeCompare(
   const bundleReport =
     request.output === undefined || report !== undefined
       ? report
-      : new ComparisonReportService({ id: context.createId, now: context.now }).create(
+      : new ComparisonReportService({
+          id: context.createId,
+          now: context.now,
+          renderer: reportRenderer,
+        }).create(
           summary,
           skillA,
           skillB,
@@ -167,6 +218,7 @@ export async function executeCompare(
             { role: "B", skill: skillB },
           ],
           instructionAssets,
+          reportTemplates: [reportTemplate],
           reportMarkdown: (bundleReport ?? report)?.markdown ?? "# Skill comparison\n",
           force: request.force === true,
         });
@@ -205,7 +257,7 @@ function comparisonInstructionAssets(
       evalCase.assertions.some((assertion) => assertion.type === "llm-rubric"),
     );
   return usesJudge
-    ? [runtime.instructionAssets.judgeSkill, runtime.instructionAssets.judgeInstruction]
+    ? [runtime.instructionAssets.judgeSkill]
     : [];
 }
 

@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 
 import type { ApplicationContext, OperationEvents } from "../context";
 import type { ExecutionRuntime } from "../../composition/execution-runtime";
+import { evaluationRunCount, runnerWithProgress } from "../progress";
 
 export function generateMergeCandidates(input: {
   context: ApplicationContext;
@@ -60,12 +61,26 @@ export async function runDevelopmentTournament(input: {
   ]);
   const tournament = await input.events.progress("Running development tournament", () =>
     new DevelopmentTournamentService(
-      new EvaluationService(input.runtime.runner, input.runtime.assertions, {
-        logger: input.context.logger,
-        id: input.context.createId,
-        now: input.context.now,
-        workspaceParent: resolve(input.projectRoot, ".skillbench", "tmp"),
-      }),
+      new EvaluationService(
+        runnerWithProgress({
+          runner: input.runtime.runner,
+          events: input.events,
+          executionProfile: input.runtime.executionProfile,
+          suite: input.suite,
+          totalRuns: evaluationRunCount(
+            input.suite,
+            input.planning.comparison.plan.repeat,
+            input.generation.candidates.length,
+          ),
+        }),
+        input.runtime.assertions,
+        {
+          logger: input.context.logger,
+          id: input.context.createId,
+          now: input.context.now,
+          workspaceParent: resolve(input.projectRoot, ".skillbench", "tmp"),
+        },
+      ),
       {
         snapshotStore: {
           save: (resolvedSkill) => {

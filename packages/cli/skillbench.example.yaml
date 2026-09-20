@@ -7,6 +7,7 @@ runner:
   maxOutputBytes: 1048576
 
 eval:
+  path: .skillbench/evals/development/default.yaml
   repeat: 3
   timeoutMs: 180000
 
@@ -35,6 +36,7 @@ merge:
 
 reports:
   markdown: true
+  template: .skillbench/reports/comparison.md
 
 outputs:
   # Interactive operations create unique bundles below this project-relative directory.

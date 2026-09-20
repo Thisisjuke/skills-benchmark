@@ -17,6 +17,7 @@ import { isAbsolute, resolve } from "node:path";
 import type { ApplicationContext, OperationEvents } from "../context";
 import type { ExecutionRuntime } from "../../composition/execution-runtime";
 import type { SkillbenchConfig } from "../../config";
+import { evaluationRunCount, runnerWithProgress } from "../progress";
 
 export async function validateMergeHoldout(input: {
   context: ApplicationContext;
@@ -39,17 +40,34 @@ export async function validateMergeHoldout(input: {
     bestParentId: input.tournament.bestParentId,
     candidateIds: input.tournament.selectedCandidateIds,
   };
+  const holdoutSuite = loadEvalSuite(projectPath(input.projectRoot, holdout), {
+    partition: "holdout",
+  });
   const handle = createLocalHoldoutExecutionHandle({
-    loadSuite: () =>
-      loadEvalSuite(projectPath(input.projectRoot, holdout), {
-        partition: "holdout",
+    loadSuite: () => holdoutSuite,
+    evaluator: new EvaluationService(
+      runnerWithProgress({
+        runner: input.runtime.runner,
+        events: input.events,
+        executionProfile: input.runtime.executionProfile,
+        suite: holdoutSuite,
+        totalRuns: evaluationRunCount(
+          holdoutSuite,
+          input.repeat,
+          selection.candidateIds.length + 1,
+        ),
+        snapshotLabels: new Map(
+          [...input.snapshots.values()].map((skill) => [skill.snapshot.id, skill.skill.name]),
+        ),
       }),
-    evaluator: new EvaluationService(input.runtime.runner, input.runtime.assertions, {
-      logger: input.context.logger,
-      id: input.context.createId,
-      now: input.context.now,
-      workspaceParent: resolve(input.projectRoot, ".skillbench", "tmp"),
-    }),
+      input.runtime.assertions,
+      {
+        logger: input.context.logger,
+        id: input.context.createId,
+        now: input.context.now,
+        workspaceParent: resolve(input.projectRoot, ".skillbench", "tmp"),
+      },
+    ),
     snapshots: {
       getById: (snapshotId) => {
         const snapshot = input.snapshots.get(snapshotId);

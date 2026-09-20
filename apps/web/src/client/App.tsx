@@ -205,7 +205,7 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
   const [command, setCommand] = useState<Command>("compare");
   const [sourceA, setSourceA] = useState("");
   const [sourceB, setSourceB] = useState("");
-  const [evals, setEvals] = useState(".skillbench/evals/development");
+  const [evals, setEvals] = useState(".skillbench/evals/development/default.yaml");
   const [holdout, setHoldout] = useState("");
   const [runner, setRunner] = useState<RunnerType>("mock");
   const [model, setModel] = useState("");
@@ -270,7 +270,7 @@ function JobForm({ sources, onCreated }: { sources: Source[]; onCreated: (job: J
             label="Suite d’évaluation"
             value={evals}
             onChange={setEvals}
-            placeholder=".skillbench/evals/development"
+            placeholder=".skillbench/evals/development/default.yaml"
           />
         ) : null}
         {command === "merge" ? (

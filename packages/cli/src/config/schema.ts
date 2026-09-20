@@ -45,6 +45,7 @@ const runnerSchema = z
 
 const evalSchema = z
   .object({
+    path: z.string().trim().min(1).default(".skillbench/evals/development/default.yaml"),
     repeat: z.number().int().min(1).max(100).default(3),
     timeoutMs: z.number().int().min(1).default(180_000),
   })
@@ -120,9 +121,12 @@ const mergeSchema = z
   })
   .strict();
 
+export const DEFAULT_COMPARISON_REPORT_PATH = ".skillbench/reports/comparison.md";
+
 const reportsSchema = z
   .object({
     markdown: z.boolean().default(true),
+    template: z.string().trim().min(1).default(DEFAULT_COMPARISON_REPORT_PATH),
   })
   .strict();
 
@@ -161,7 +165,11 @@ export const skillbenchConfigSchema = z
       sandbox: "workspace-write",
       maxOutputBytes: 1024 * 1024,
     }),
-    eval: evalSchema.default({ repeat: 3, timeoutMs: 180_000 }),
+    eval: evalSchema.default({
+      path: ".skillbench/evals/development/default.yaml",
+      repeat: 3,
+      timeoutMs: 180_000,
+    }),
     comparison: comparisonSchema.default({
       tieThreshold: 0.01,
       weights: {
@@ -177,7 +185,10 @@ export const skillbenchConfigSchema = z
     judge: judgeSchema.default({ blind: true, reversePairwise: true }),
     promptfoo: promptfooSchema.default({ enabled: true }),
     merge: mergeSchema.default({ candidates: 3, requireImprovement: true, minimumImprovement: 0 }),
-    reports: reportsSchema.default({ markdown: true }),
+    reports: reportsSchema.default({
+      markdown: true,
+      template: DEFAULT_COMPARISON_REPORT_PATH,
+    }),
     outputs: outputsSchema.default({ directory: DEFAULT_RUNS_DIRECTORY }),
     sources: sourcesSchema.default({
       timeoutMs: 30_000,

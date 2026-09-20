@@ -139,9 +139,9 @@ try {
       "--json",
     ]),
   );
-  const promptfooAssertion = evaluated.data.attempts[0]?.assertions?.find(
-    (assertion) => assertion.type === "promptfoo",
-  );
+  const promptfooAssertion = evaluated.data.attempts
+    .flatMap((attempt) => attempt.assertions ?? [])
+    .find((assertion) => assertion.type === "promptfoo");
   if (promptfooAssertion?.evidence?.engine !== "promptfoo") {
     throw new Error("Packaged CLI did not execute its embedded Promptfoo assertion engine");
   }

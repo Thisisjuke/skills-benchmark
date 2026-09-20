@@ -97,6 +97,7 @@ export async function executeMerge(
     repeat,
     permissions,
     effectiveConfig,
+    events: request.events,
   });
   await request.events.confirmPreflight(
     {

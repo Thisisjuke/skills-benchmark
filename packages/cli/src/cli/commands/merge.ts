@@ -5,11 +5,13 @@ import type { ExecutionCommandContext } from "../command-context";
 import {
   getGlobalOptions,
   noOutputOption,
+  nonEmptyString,
   positiveInteger,
   sourceResolveOptions,
   validateOutputOptions,
 } from "../options";
 import { ensureInitializedProject } from "../ensure-project";
+import { chooseEvalFile, validateEvalInput } from "../project-choices";
 import { renderMergeResult } from "../renderers";
 import {
   resolveRunOutput,
@@ -23,13 +25,13 @@ export function registerMergeCommand(program: Command, context: ExecutionCommand
     .description("generate and rank merge candidates from a development comparison")
     .argument("[skill-a]", "first skill directory or GitHub source")
     .argument("[skill-b]", "second skill directory or GitHub source")
-    .option("--evals <path>", "development YAML scoring tasks and assertions")
-    .option("--holdout <path>", "holdout YAML tasks for final candidate validation")
-    .option("--comparison <path>", "reuse a compatible compare result or bundle")
+    .option("--evals <path>", "development YAML scoring tasks and assertions", nonEmptyString)
+    .option("--holdout <path>", "holdout YAML tasks for final candidate validation", nonEmptyString)
+    .option("--comparison <path>", "reuse a compatible compare result or bundle", nonEmptyString)
     .option("--repeat <count>", "override the configured repetition count", positiveInteger)
-    .option("--skill-path-a <path>", "repository-relative SKILL.md path for the first source")
-    .option("--skill-path-b <path>", "repository-relative SKILL.md path for the second source")
-    .option("-o, --output <directory>", "use this exact result bundle directory")
+    .option("--skill-path-a <path>", "repository-relative SKILL.md path for the first source", nonEmptyString)
+    .option("--skill-path-b <path>", "repository-relative SKILL.md path for the second source", nonEmptyString)
+    .option("-o, --output <directory>", "use this exact result bundle directory", nonEmptyString)
     .addOption(noOutputOption())
     .option("--force", "replace the exact bundle at --output")
     .option("--json", "write structured JSON")
@@ -68,12 +70,26 @@ export function registerMergeCommand(program: Command, context: ExecutionCommand
           "skill-b",
           "What is the second source to merge?",
         );
-        const evals = await session.value(
-          options.evals,
-          "Which development eval YAML file or directory defines the tasks and assertions used to score merge candidates?",
-          ".skillbench/evals/development",
+        const evals = await chooseEvalFile({
+          supplied: options.evals,
+          configuredPath: config.eval.path,
+          partition: "development",
+          projectRoot: layout.root,
+          session,
+        });
+        validateEvalInput({ path: evals, partition: "development", projectRoot: layout.root });
+        if (options.holdout !== undefined) {
+          validateEvalInput({
+            path: options.holdout,
+            partition: "holdout",
+            projectRoot: layout.root,
+          });
+        }
+        const repeat = await session.count(
+          options.repeat,
+          "How many repetitions? 1 is fastest; 2-3 reduce variance; 10 costs about 10× per case and skill.",
+          config.eval.repeat,
         );
-        const repeat = await session.count(options.repeat, "How many repetitions?", config.eval.repeat);
         const output = resolveRunOutput({
           command: "merge",
           config,
@@ -108,7 +124,12 @@ export function registerMergeCommand(program: Command, context: ExecutionCommand
           context.writeJson("merge", operation.result);
           return;
         }
-        context.writeStdout(renderMergeResult({ sourceA, sourceB, evals, operation }));
+        const rendered = renderMergeResult({ sourceA, sourceB, evals, operation });
+        if (!("runId" in operation.result) && session.interactive) {
+          session.notice(rendered.trim(), "Merge skipped");
+          return;
+        }
+        context.writeStdout(rendered);
       },
     );
 }

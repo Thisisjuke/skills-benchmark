@@ -2,6 +2,7 @@ export {
   COMPARISON_RENDERER_VERSION,
   renderComparisonReport,
 } from "./comparison-renderer";
+export { createComparisonTemplateRenderer } from "./comparison-template";
 export {
   renderEvaluationBundleReport,
   renderInspectBundleReport,

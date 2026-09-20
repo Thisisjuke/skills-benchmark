@@ -13,7 +13,6 @@ export type RunnerBackedJudgeOptions = {
   timeoutMs?: number;
   workspaceParent?: string;
   skillSnapshot: SkillSnapshot;
-  instruction: string;
   id?: () => string;
 };
 
@@ -30,7 +29,6 @@ export class RunnerBackedJudge implements Judge {
   private readonly executionProfile: ExecutionProfile;
   private readonly workspaceParent: string;
   private readonly skillSnapshot: SkillSnapshot;
-  private readonly instruction: string;
   private readonly id: () => string;
 
   constructor(
@@ -41,8 +39,6 @@ export class RunnerBackedJudge implements Judge {
     this.executionProfile = options.executionProfile;
     this.workspaceParent = options.workspaceParent ?? tmpdir();
     this.skillSnapshot = options.skillSnapshot;
-    this.instruction = options.instruction.trim();
-    if (this.instruction === "") throw new Error("Judge instruction cannot be empty");
     this.id = options.id ?? (() => crypto.randomUUID());
   }
 
@@ -57,7 +53,6 @@ export class RunnerBackedJudge implements Judge {
         repetition: 1,
         snapshot: this.skillSnapshot,
         prompt: JSON.stringify({
-          instruction: this.instruction,
           rubric: input.rubric,
           prompt: input.prompt,
           candidates: input.candidates,

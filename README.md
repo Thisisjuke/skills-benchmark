@@ -77,6 +77,10 @@ The current directory becomes the Skillbench project. Versionable configuration,
 evaluation suites, and model-facing instructions live under `.skillbench/`; only
 generated subdirectories such as runs, temporary workspaces, caches, and Web state are
 ignored. Interactive commands save unique bundles below `.skillbench/runs/` by default.
+The generated `development/default.yaml` is the active runnable starter evaluation;
+`evals/examples/example.yaml` is a richer multi-axis reference. Interactive commands list available
+eval files, and comparison reports come from an editable Markdown template in
+`.skillbench/reports/`.
 Use `--no-output` to opt out, or `--output <directory>` to choose an exact destination.
 Automation remains explicit and does not create a bundle unless it passes `--output`.
 

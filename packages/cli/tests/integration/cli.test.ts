@@ -8,7 +8,7 @@ import { SKILLBENCH_CLI_COMMANDS } from "@skillbench/invocation-contract";
 import { AUTOMATION_REQUEST_FIXTURES } from "@skillbench/test-contracts";
 import { createDebugLogger } from "@skillbench/sdk/logging";
 import { createProgram } from "../../src/cli/program";
-import { reasoningEffort, runnerType } from "../../src/cli/options";
+import { nonEmptyString, reasoningEffort, runnerType } from "../../src/cli/options";
 import { initializeProject } from "../../src/init";
 
 const fixtureSkill = fileURLToPath(new URL("../fixtures/skills/basic", import.meta.url));
@@ -99,6 +99,11 @@ describe("database-free CLI", () => {
         );
       }
     }
+  });
+
+  it("normalizes non-empty text options and rejects whitespace-only values", () => {
+    expect(nonEmptyString("  path/to/input  ")).toBe("path/to/input");
+    expect(() => nonEmptyString("   ")).toThrow(/must not be empty/u);
   });
 
   it("shows the global automation and diagnostic options in subcommand help", () => {
@@ -302,6 +307,45 @@ describe("database-free CLI", () => {
     expect(new Set(events.map((event) => event.jobId)).size).toBe(1);
   });
 
+  it("streams per-run progress in JSONL evaluation output", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "skillbench-jsonl-progress-"));
+    const evals = createEvalSuite(cwd);
+    const output = await runCli(cwd, [
+      "eval",
+      fixtureSkill,
+      "--evals",
+      evals,
+      "--repeat",
+      "1",
+      "--runner",
+      "mock",
+      "--jsonl",
+      "--no-input",
+    ]);
+    const events = output
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const progress = events.filter((event) => event.event === "progress");
+
+    expect(progress).toHaveLength(2);
+    expect(progress[0]).toMatchObject({
+      data: {
+        current: 1,
+        total: 1,
+        message: expect.stringContaining("Sending basic-skill"),
+      },
+    });
+    expect(progress[1]).toMatchObject({
+      data: {
+        current: 1,
+        total: 1,
+        message: expect.stringContaining("Checking results for basic-skill"),
+      },
+    });
+    expect(events.at(-1)?.event).toBe("completed");
+  });
+
   it("keeps debug diagnostics separate from JSON and JSONL stdout", async () => {
     for (const mode of ["--json", "--jsonl"] as const) {
       const cwd = mkdtempSync(join(tmpdir(), "skillbench-debug-output-"));
@@ -453,6 +497,8 @@ describe("database-free CLI", () => {
         "1",
         "--runner",
         "mock",
+        "--report-template",
+        ".skillbench/reports/comparison.md",
         "--yes",
       ],
       [
@@ -486,6 +532,18 @@ describe("database-free CLI", () => {
         existsSync(join(cwd, ".skillbench", "runs", command, bundles[0]!, "report.md")),
         command,
       ).toBe(true);
+      if (command === "compare") {
+        const bundle = join(cwd, ".skillbench", "runs", command, bundles[0]!);
+        expect(existsSync(join(bundle, "reports", "templates", "comparison.md"))).toBe(true);
+        expect(JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")).reports).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: "comparison-template",
+              path: "reports/templates/comparison.md",
+            }),
+          ]),
+        );
+      }
     }
   });
 
@@ -527,8 +585,9 @@ describe("database-free CLI", () => {
     expect(output).toContain("  - .skillbench/config.yaml");
     expect(output).toContain("Runs directory: .skillbench/runs");
     expect(output).toContain(
-      "Edit .skillbench/evals/development/example.yaml to define the tasks and assertions used to score your skills.",
+      "Edit .skillbench/evals/development/default.yaml; this is the active task used by default.",
     );
+    expect(output).toContain(".skillbench/evals/examples/example.yaml");
     expect(output).toContain("skillbench compare <skill-a> <skill-b>");
     expect(output).not.toContain(cwd);
   });

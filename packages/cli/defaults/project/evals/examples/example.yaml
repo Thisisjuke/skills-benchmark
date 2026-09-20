@@ -1,0 +1,41 @@
+# Reference only: this richer file lives outside development/ and is not run by default.
+# Copy it into development/ and adapt it to exercise several complementary quality axes.
+id: prepare-release-plan
+name: Prepare a release plan and risk register
+partition: development
+prompt: |
+  Prepare a small release package for version 1.2.3:
+
+  1. Create RELEASE_PLAN.md with a "Release plan" heading, sections named
+     "Validation", "Rollout", and "Rollback", and at least one Markdown checkbox.
+  2. Create risk-register.json containing a JSON array. Each entry must have a
+     non-empty "risk" string and a "mitigation" string.
+  3. Keep the plan concise and make every action directly executable by a maintainer.
+assertions:
+  - type: exit-code
+    value: 0
+  - type: file-exists
+    value: RELEASE_PLAN.md
+  - type: file-exists
+    value: risk-register.json
+  - type: contains
+    path: RELEASE_PLAN.md
+    value: "# Release plan"
+  - type: regex
+    path: RELEASE_PLAN.md
+    pattern: "## Validation[\\s\\S]*## Rollout[\\s\\S]*## Rollback"
+  - type: regex
+    path: RELEASE_PLAN.md
+    pattern: "- \\[ \\]"
+  - type: command
+    command:
+      - node
+      - -e
+      - >-
+        const fs=require('node:fs'); const rows=JSON.parse(fs.readFileSync('risk-register.json','utf8'));
+        if (!Array.isArray(rows) || rows.length === 0 || rows.some(({risk,mitigation}) =>
+        typeof risk !== 'string' || !risk.trim() || typeof mitigation !== 'string' ||
+        !mitigation.trim())) process.exit(1);
+  # Qualitative assertions use the configured judge skill and complement deterministic checks.
+  - type: llm-rubric
+    rubric: The release plan is concise, actionable, internally consistent, and covers validation, rollout safety, rollback readiness, and meaningful risk mitigation.

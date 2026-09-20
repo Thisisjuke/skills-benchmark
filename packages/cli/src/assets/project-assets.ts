@@ -23,7 +23,6 @@ export const projectAssetManifestSchema = z.strictObject({
   schemaVersion: z.literal(1),
   assets: z.strictObject({
     judgeSkill: assetPathSchema,
-    judgeInstruction: assetPathSchema,
     mergeCandidateTemplate: assetPathSchema,
   }),
 });
@@ -37,7 +36,6 @@ export type ProjectAsset = InstructionAssetReference & {
 export type ProjectRuntimeAssets = {
   manifestPath: string;
   judgeSkill: ProjectAsset;
-  judgeInstruction: ProjectAsset;
   mergeCandidateTemplate: ProjectAsset;
   references: InstructionAssetReference[];
 };
@@ -63,12 +61,6 @@ export function loadProjectRuntimeAssets(projectRoot: string): ProjectRuntimeAss
     );
   }
   const judgeSkill = loadAsset(root, assetsRoot, "judge-skill", parsed.data.assets.judgeSkill);
-  const judgeInstruction = loadAsset(
-    root,
-    assetsRoot,
-    "judge-instruction",
-    parsed.data.assets.judgeInstruction,
-  );
   const mergeCandidateTemplate = loadAsset(
     root,
     assetsRoot,
@@ -78,10 +70,18 @@ export function loadProjectRuntimeAssets(projectRoot: string): ProjectRuntimeAss
   return {
     manifestPath,
     judgeSkill,
-    judgeInstruction,
     mergeCandidateTemplate,
-    references: [judgeSkill, judgeInstruction, mergeCandidateTemplate].map(reference),
+    references: [judgeSkill, mergeCandidateTemplate].map(reference),
   };
+}
+
+export function loadProjectFileAsset(
+  projectRoot: string,
+  id: string,
+  configuredPath: string,
+): ProjectAsset {
+  const root = resolve(projectRoot);
+  return loadAsset(root, root, id, configuredPath);
 }
 
 export function assetSkillFile(asset: ProjectAsset): SkillFile {
@@ -101,7 +101,7 @@ function loadAsset(
 ): ProjectAsset {
   const absolutePath = resolve(assetsRoot, ...configuredPath.split("/"));
   if (!inside(assetsRoot, absolutePath)) {
-    throw assetError(`Instruction asset escapes .skillbench/: ${configuredPath}`);
+    throw assetError(`Project asset escapes its allowed root: ${configuredPath}`);
   }
   let content: Uint8Array;
   try {
@@ -116,7 +116,7 @@ function loadAsset(
     content = readFileSync(realAssetPath);
   } catch (error) {
     throw assetError(
-      `Cannot read required instruction asset ${projectPath(projectRoot, absolutePath)}. Run "skillbench init --force" to restore project assets.`,
+      `Cannot read required project asset ${projectPath(projectRoot, absolutePath)}. Run "skillbench init --force" to restore project assets.`,
       error,
     );
   }
@@ -124,9 +124,9 @@ function loadAsset(
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(content);
   } catch (error) {
-    throw assetError(`Instruction asset must be valid UTF-8: ${configuredPath}`, error);
+    throw assetError(`Project asset must be valid UTF-8: ${configuredPath}`, error);
   }
-  if (text.trim() === "") throw assetError(`Instruction asset cannot be empty: ${configuredPath}`);
+  if (text.trim() === "") throw assetError(`Project asset cannot be empty: ${configuredPath}`);
   return {
     id,
     path: projectPath(projectRoot, absolutePath),

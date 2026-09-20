@@ -55,7 +55,10 @@ export interface PromptPort {
   confirm(input: { message: string; initialValue?: boolean }): Promise<boolean>;
   cancel(message: string): void;
   note(message: string, title?: string): void;
-  progress<Value>(message: string, task: () => Promise<Value>): Promise<Value>;
+  progress<Value>(
+    message: string,
+    task: (update: (message: string) => void) => Promise<Value>,
+  ): Promise<Value>;
 }
 
 export type PromptSessionOptions = {
@@ -63,9 +66,12 @@ export type PromptSessionOptions = {
   yes: boolean;
   prompts: PromptPort;
   onProgress?: (message: string) => void;
+  onStatus?: (message: string, current?: number, total?: number) => void;
 };
 
 export class PromptSession {
+  private updateActiveProgress: ((message: string) => void) | undefined;
+
   constructor(private readonly options: PromptSessionOptions) {}
 
   get interactive(): boolean {
@@ -73,7 +79,7 @@ export class PromptSession {
   }
 
   async requiredText(value: string | undefined, label: string, message: string): Promise<string> {
-    if (value !== undefined && value.trim() !== "") return value;
+    if (value !== undefined && value.trim() !== "") return value.trim();
     if (!this.options.interactive) {
       throw new SkillbenchError(`${label} is required in non-interactive mode`, {
         code: "CLI_INPUT_REQUIRED",
@@ -212,10 +218,36 @@ export class PromptSession {
     message: string,
     defaultValue: string,
   ): Promise<string> {
-    if (supplied !== undefined && supplied.trim() !== "") return supplied;
+    if (supplied !== undefined && supplied.trim() !== "") return supplied.trim();
     if (!this.options.interactive) return defaultValue;
     const answer = (await this.options.prompts.text({ message, initialValue: defaultValue })).trim();
     return answer === "" ? defaultValue : answer;
+  }
+
+  async choose<Value extends string>(
+    message: string,
+    options: PromptOption<Value>[],
+    initialValue?: Value,
+  ): Promise<Value> {
+    if (!this.options.interactive) {
+      throw new SkillbenchError("A choice was requested in non-interactive mode", {
+        code: "CLI_INPUT_REQUIRED",
+      });
+    }
+    return this.options.prompts.select({
+      message,
+      options,
+      ...(initialValue === undefined ? {} : { initialValue }),
+    });
+  }
+
+  notice(message: string, title?: string): void {
+    if (this.options.interactive) this.options.prompts.note(message, title);
+  }
+
+  status(message: string, current?: number, total?: number): void {
+    this.options.onStatus?.(message, current, total);
+    this.updateActiveProgress?.(progressStatus(message, current, total));
   }
 
   async count(supplied: number | undefined, message: string, defaultValue: number): Promise<number> {
@@ -284,8 +316,20 @@ export class PromptSession {
 
   async progress<Value>(message: string, task: () => Promise<Value>): Promise<Value> {
     this.options.onProgress?.(message);
-    return this.options.interactive ? this.options.prompts.progress(message, task) : task();
+    if (!this.options.interactive) return task();
+    return this.options.prompts.progress(message, async (update) => {
+      this.updateActiveProgress = update;
+      try {
+        return await task();
+      } finally {
+        this.updateActiveProgress = undefined;
+      }
+    });
   }
+}
+
+function progressStatus(message: string, current?: number, total?: number): string {
+  return current === undefined || total === undefined ? message : `[${current}/${total}] ${message}`;
 }
 
 function configuredRunnerChoice(config: SkillbenchConfig): RunnerChoice | undefined {
@@ -342,11 +386,14 @@ export function createClackPromptPort(input: Readable, output: Writable): Prompt
     note(message, title): void {
       clackNote(message, title, common);
     },
-    async progress<Value>(message: string, task: () => Promise<Value>): Promise<Value> {
+    async progress<Value>(
+      message: string,
+      task: (update: (message: string) => void) => Promise<Value>,
+    ): Promise<Value> {
       const indicator = clackSpinner(common);
       indicator.start(message);
       try {
-        const result = await task();
+        const result = await task((nextMessage) => indicator.message(nextMessage));
         indicator.stop(message);
         return result;
       } catch (error) {

@@ -12,6 +12,9 @@ The monorepo resolves `workspace:*` locally and substitutes the packed CLI tarba
 external-consumer smoke test. The Web package must not copy CLI internals or convert them
 into a source-level dependency.
 
+See the [monorepo package map](../../packages/README.md) for the private bundled modules and their
+dependency direction; those `@skillbench/*` workspaces are not separately published packages.
+
 ## Workspace contract
 
 - **Status:** public npm product exposing the `skillbench-web` binary.
@@ -35,7 +38,7 @@ npx @thisisjuke/skillbench init
 npx @thisisjuke/skillbench-web --project .
 ```
 
-The job form defaults to `.skillbench/evals/development`. It submits an explicit runner
+The job form defaults to `.skillbench/evals/development/default.yaml`. It submits an explicit runner
 profile and always gives the CLI a temporary output destination, so Web jobs do not
 depend on interactive prompts or automatic CLI run paths.
 

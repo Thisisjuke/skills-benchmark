@@ -1,1 +1,0 @@
-Apply the installed skillbench-judge skill and return only strict JSON.

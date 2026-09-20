@@ -20,7 +20,8 @@ export function renderInitialization(result: InitResult, cwd: string): string {
   lines.push(
     "",
     "Next:",
-    "  1. Edit .skillbench/evals/development/example.yaml to define the tasks and assertions used to score your skills.",
+    "  1. Edit .skillbench/evals/development/default.yaml; this is the active task used by default.",
+    "     See .skillbench/evals/examples/example.yaml for a richer reference that is not run automatically.",
     "  2. Run: skillbench compare <skill-a> <skill-b>",
   );
   return `${lines.join("\n")}\n`;

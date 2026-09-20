@@ -5,7 +5,7 @@ import { CLI_HISTORY_VERSION, type CliHistoryStore } from "../../history";
 import type { ExecutionCommandContext } from "../command-context";
 import { findHistoryEntry, historyArguments, validateHistoryPaths } from "../history-replay";
 import { interactiveEnabled, type PromptPort } from "../interactive";
-import { getGlobalOptions, globalArguments, validateOutputMode } from "../options";
+import { getGlobalOptions, globalArguments, nonEmptyString, validateOutputMode } from "../options";
 import { historyHint, renderHistory } from "../renderers";
 
 export type HistoryCommandEnvironment = {
@@ -23,7 +23,7 @@ export function registerHistoryCommand(
   program
     .command("history")
     .description("list or rerun the ten most recent interactive comparisons")
-    .option("--rerun <id>", "rerun one history entry")
+    .option("--rerun <id>", "rerun one history entry", nonEmptyString)
     .option("--json", "write structured JSON")
     .action(async (options: { rerun?: string; json?: boolean }, command: Command) => {
       const global = getGlobalOptions(command);

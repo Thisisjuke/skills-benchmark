@@ -36,7 +36,7 @@ describe("Skillbench Web client", () => {
     );
     expect(screen.getByLabelText("Source B")).toBeTruthy();
     expect((screen.getByLabelText("Suite d’évaluation") as HTMLInputElement).value).toBe(
-      ".skillbench/evals/development",
+      ".skillbench/evals/development/default.yaml",
     );
 
     await userEvent.click(screen.getByRole("tab", { name: "inspect" }));

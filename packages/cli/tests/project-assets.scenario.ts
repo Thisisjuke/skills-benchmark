@@ -18,13 +18,13 @@ describe("project runtime assets", () => {
   it("fingerprints local edits and never falls back when an asset is missing", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-assets-"));
     initializeProject(cwd);
-    const instruction = join(cwd, ".skillbench", "prompts", "judge-instruction.txt");
+    const instruction = join(cwd, ".skillbench", "prompts", "judge", "SKILL.md");
     const initial = loadProjectRuntimeAssets(cwd);
 
     writeFileSync(instruction, `${readFileSync(instruction, "utf8")}\nBe concise.\n`, "utf8");
     const changed = loadProjectRuntimeAssets(cwd);
-    expect(changed.judgeInstruction.contentHash).not.toBe(
-      initial.judgeInstruction.contentHash,
+    expect(changed.judgeSkill.contentHash).not.toBe(
+      initial.judgeSkill.contentHash,
     );
 
     unlinkSync(instruction);
@@ -35,7 +35,7 @@ describe("project runtime assets", () => {
     const cwd = mkdtempSync(join(tmpdir(), "skillbench-assets-"));
     const outside = join(mkdtempSync(join(tmpdir(), "skillbench-outside-")), "prompt.txt");
     initializeProject(cwd);
-    const instruction = join(cwd, ".skillbench", "prompts", "judge-instruction.txt");
+    const instruction = join(cwd, ".skillbench", "prompts", "judge", "SKILL.md");
     writeFileSync(outside, "External instructions", "utf8");
     unlinkSync(instruction);
     symlinkSync(outside, instruction);

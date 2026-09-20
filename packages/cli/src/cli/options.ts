@@ -39,6 +39,12 @@ export function positiveInteger(value: string): number {
   return parsed;
 }
 
+export function nonEmptyString(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "") throw new InvalidArgumentError("must not be empty");
+  return trimmed;
+}
+
 export function partition(value: string): EvalPartition {
   if (value !== "development" && value !== "holdout") {
     throw new InvalidArgumentError("must be development or holdout");
@@ -91,7 +97,7 @@ export function sourceResolveOptions(
   const options = getGlobalOptions(command);
   return {
     offline: options.offline === true,
-    ...(skillPath === undefined ? {} : { skillPath }),
+    ...(skillPath === undefined ? {} : { skillPath: skillPath.trim() }),
     selectSkill: (paths) => session.chooseSkill(paths),
   };
 }

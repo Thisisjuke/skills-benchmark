@@ -4,6 +4,7 @@ import { executeInspect } from "../../application";
 import type { ExecutionCommandContext } from "../command-context";
 import {
   getGlobalOptions,
+  nonEmptyString,
   noOutputOption,
   sourceResolveOptions,
   validateOutputOptions,
@@ -21,8 +22,8 @@ export function registerInspectCommand(program: Command, context: ExecutionComma
     .command("inspect")
     .description("resolve and inspect a local or GitHub skill")
     .argument("[skill]", "skill directory, SKILL.md path or GitHub source")
-    .option("--skill-path <path>", "repository-relative SKILL.md path for GitHub discovery")
-    .option("-o, --output <directory>", "use this exact result bundle directory")
+    .option("--skill-path <path>", "repository-relative SKILL.md path for GitHub discovery", nonEmptyString)
+    .option("-o, --output <directory>", "use this exact result bundle directory", nonEmptyString)
     .addOption(noOutputOption())
     .option("--force", "replace the exact bundle at --output")
     .option("--json", "write structured JSON")

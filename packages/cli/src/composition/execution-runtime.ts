@@ -87,7 +87,6 @@ function modelRuntime(
         executionProfile,
         workspaceParent: layout.temporary,
         skillSnapshot: judgeSnapshot(instructionAssets),
-        instruction: instructionAssets.judgeInstruction.text,
       }),
       { timeoutMs: config.eval.timeoutMs },
     ),
@@ -100,7 +99,7 @@ function judgeSnapshot(assets: ProjectRuntimeAssets): SkillSnapshot {
   return {
     id: `project-judge-${assets.judgeSkill.contentHash}`,
     origin: { type: "local", originalInput: assets.judgeSkill.path },
-    rootPath: ".skillbench/judge",
+    rootPath: ".skillbench/prompts/judge",
     files: [file],
     fingerprint: fingerprintFiles([file]),
     fingerprintAlgorithm: FINGERPRINT_ALGORITHM,

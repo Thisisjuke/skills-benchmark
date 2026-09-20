@@ -40,6 +40,9 @@ jobs:
           fi
           echo "RELEASE_VERSION=$cli_version" >> "$GITHUB_ENV"
 
+      - name: Validate versioned release notes
+        run: node scripts/validate-release-notes.mjs "$GITHUB_REF_NAME"
+
       - name: Verify npm trusted-publishing identity
         shell: bash
         run: |
@@ -121,7 +124,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes_path=".github/releases/$GITHUB_REF_NAME.md"
-          test -s "$notes_path"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" \
               --title "Skillbench $GITHUB_REF_NAME" \

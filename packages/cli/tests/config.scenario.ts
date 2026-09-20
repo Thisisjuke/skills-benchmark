@@ -26,6 +26,7 @@ describe("loadConfig", () => {
       maxOutputBytes: 1024 * 1024,
     });
     expect(config.eval.repeat).toBe(3);
+    expect(config.eval.path).toBe(".skillbench/evals/development/default.yaml");
     expect(config.comparison.tieThreshold).toBe(0.01);
     expect(config.promptfoo).toEqual({ enabled: true });
     expect(
@@ -36,7 +37,10 @@ describe("loadConfig", () => {
       maxFileSizeBytes: 2 * 1024 * 1024,
       maxSnapshotSizeBytes: 25 * 1024 * 1024,
     });
-    expect(config.reports).toEqual({ markdown: true });
+    expect(config.reports).toEqual({
+      markdown: true,
+      template: ".skillbench/reports/comparison.md",
+    });
     expect(config.outputs).toEqual({ directory: ".skillbench/runs" });
   });
 

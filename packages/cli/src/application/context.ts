@@ -10,6 +10,7 @@ import type { PreflightInput } from "./preflight";
 
 export interface OperationEvents {
   progress<Value>(message: string, task: () => Promise<Value>): Promise<Value>;
+  status(message: string, current?: number, total?: number): void;
   confirmPreflight(input: PreflightInput): Promise<void>;
 }
 

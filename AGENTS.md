@@ -27,3 +27,13 @@
 - Run `vp run boundaries` after dependency changes, `vp run instructions` after runtime
   instruction changes, and `vp run smoke:release` after packaging changes.
 - Add a changeset for user-visible CLI or Web changes.
+
+## Releases
+
+- Before creating `vX.Y.Z`, add a non-empty `.github/releases/vX.Y.Z.md` based on
+  `.github/releases/TEMPLATE.md`.
+- Release notes must include a user-facing `## Changelog` and an `## Upgrade` or migration
+  section. Include copyable migration commands whenever project layout or configuration changes.
+- The tag, CLI version, Web version, and notes filename must match exactly. The release workflow
+  validates this contract before any npm publication and creates or updates the GitHub Release
+  from that exact Markdown file after publication succeeds.

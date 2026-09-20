@@ -23,7 +23,6 @@ const judgeFile = {
   sizeBytes: judgeContent.byteLength,
 };
 const JUDGE_OPTIONS = {
-  instruction: "Return strict JSON.",
   skillSnapshot: {
     id: "judge",
     origin: { type: "local" as const, originalInput: "test-judge" },
@@ -87,6 +86,7 @@ describe("RunnerBackedJudge", () => {
     expect(result).toMatchObject({ winner: "X", confidence: 0.75, reasons: ["clearer"] });
     expect(receivedPrompt).toContain('"label":"X"');
     expect(receivedPrompt).toContain('"label":"Y"');
+    expect(receivedPrompt).not.toContain("instruction");
     expect(existsSync(workspaceParent) ? readdirSync(workspaceParent) : []).toEqual([]);
   });
 
